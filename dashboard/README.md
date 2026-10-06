@@ -1,6 +1,7 @@
 # Atlas interactivo del acceso a salud en el Atlántico
 
 Dashboard en **Plotly Dash** calculado desde la base analítica del [EDA en Python](https://acarvajalb21.github.io/EDAPYTHON/).
+**Versión pública:** [abrir el Dash Python en Google Cloud Run](https://eda-salud-atlantico-python-409319239507.us-east1.run.app/).
 Permite seleccionar un municipio desde el mapa, el ranking o el buscador; cambiar entre acceso y
 no acceso; examinar desgloses por sexo, dificultad funcional, edad, zona, estrato y educación;
 y descargar la tabla agregada de la vista actual.

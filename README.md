@@ -4,9 +4,12 @@ Autores: Alejandro Carvajal y Mateo Chang
 
 Este proyecto describe el acceso a atención formal entre las personas registradas en los microdatos anonimizados del CNPV 2018 para el Atlántico que reportaron un problema de salud en los 30 días previos y cuyo acceso pudo clasificarse. La respuesta se construye a partir del tratamiento principal y, para quienes acudieron a su entidad de seguridad social, la confirmación de atención. El análisis es descriptivo y no establece causas ni diferencias inferenciales.
 
-El procedimiento y los resultados están en [el cuaderno](EDA_acceso_salud_Atlantico_CNPV2018.ipynb). La versión preparada para GitHub Pages está en `docs/` y su dirección prevista es <https://acarvajalb21.github.io/EDAPYTHON/>.
+El procedimiento y los resultados están en [el cuaderno](EDA_acceso_salud_Atlantico_CNPV2018.ipynb). Para la entrega al profesor:
 
-El [dashboard interactivo](dashboard/README.md) en Plotly Dash permite seleccionar cada municipio, comparar acceso y no acceso, revisar desgloses por grupo y descargar datos agregados. Se prepara para un servicio independiente de Google Cloud Run.
+- **Jupyter Book:** <https://acarvajalb21.github.io/EDAPYTHON/>
+- **Dash Python:** <https://eda-salud-atlantico-python-409319239507.us-east1.run.app/>
+
+El [dashboard interactivo](dashboard/README.md) en Plotly Dash permite seleccionar cada municipio, comparar acceso y no acceso, revisar desgloses por grupo y descargar datos agregados. Se publica en Google Cloud Run y se actualiza desde `main` mediante Cloud Build.
 
 ## Estructura
 

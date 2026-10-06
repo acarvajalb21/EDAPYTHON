@@ -17,3 +17,5 @@ Los CSV censales originales no se publican en este repositorio. Los resultados, 
 ```
 
 Seleccione «Análisis exploratorio completo» en el menú para consultar el procedimiento y los resultados.
+
+Para explorar los resultados con filtros por municipio y características de las personas, abra el [Dash interactivo del EDA en Python](https://eda-salud-atlantico-python-409319239507.us-east1.run.app/).
