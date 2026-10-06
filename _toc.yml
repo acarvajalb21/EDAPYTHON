@@ -1,0 +1,5 @@
+format: jb-book
+root: intro
+chapters:
+  - file: EDA_acceso_salud_Atlantico_CNPV2018
+    title: Análisis exploratorio completo

@@ -1,0 +1,16 @@
+_build/
+dashboard/.venv/
+**/__pycache__/
+.jupyter_cache/
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+.vscode/
+
+datos/*.CSV
+datos/*.csv
+salidas/*.CSV
+salidas/*.csv
+
+*.zip
+.DS_Store
+Thumbs.db

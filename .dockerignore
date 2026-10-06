@@ -1,0 +1,13 @@
+.git
+.github
+**/.venv
+dashboard/.venv
+**/__pycache__
+_build
+.jupyter_cache
+salidas
+docs
+figuras
+datos/*.CSV
+datos/*.csv
+*.zip
