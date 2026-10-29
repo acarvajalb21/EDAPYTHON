@@ -1,11 +1,9 @@
 # Modelo de acceso formal a salud — CNPV 2018, Atlántico
 
 Este directorio contiene un experimento de clasificación reproducible sobre los
-microdatos de personas, hogares y viviendas del CNPV 2018. El proyecto original
-se leyó en modo de solo lectura desde
-`C:\Users\Alejandro Carvajal\OneDrive\Documents\PROYECTO_DISCAPACIDAD`.
-La app `app_dash/` de este repositorio es un ejemplo académico de créditos y
-no forma parte del análisis de salud.
+microdatos de personas, hogares y viviendas del CNPV 2018. Los archivos
+originales se leyeron localmente y no se distribuyen en este repositorio.
+El tablero vigente está en `dash_salud/`.
 
 ## Problema y población
 

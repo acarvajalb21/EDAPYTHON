@@ -13,7 +13,7 @@ una barrera causal.
 
 Los CSV originales del DANE se leen localmente con
 `python -m dash_salud.generar_datos --data-dir RUTA_A_LOS_CSV`, desde la raíz de
-`DATAVIZ`. El generador valida sus SHA-256 frente al informe de entrenamiento,
+`EDAPYTHON`. El generador valida sus SHA-256 frente al informe de entrenamiento,
 reproduce la prueba reservada y escribe dos JSON:
 
 - `data/eda.json`: cubo real de municipio × sexo × edad amplia × zona ×
@@ -38,15 +38,16 @@ y métricas están documentadas en `ml_salud/resultados/INFORME_MODELO.md`.
 
 ## Probar localmente
 
-Instale `requirements.txt` en un entorno de Python compatible y ejecute,
-desde la raíz del proyecto:
+Instale `dash_salud/requirements.txt` en un entorno de Python compatible. El
+tablero funciona con los JSON agregados incluidos; desde la raíz ejecute:
 
 ```powershell
-python -m dash_salud.generar_datos --data-dir 'C:\Users\Alejandro Carvajal\OneDrive\Documents\PROYECTO_DISCAPACIDAD\data'
 python -m dash_salud.app
 ```
 
-Abra `http://localhost:8050`. El generador usa el entorno de entrenamiento
+Abra `http://localhost:8050`. Para regenerar los agregados, instale también
+`ml_salud/requirements.txt` y ejecute
+`python -m dash_salud.generar_datos --data-dir RUTA_CSV_DANE`. El generador usa el entorno de entrenamiento
 de `ml_salud` (pandas, scikit-learn y joblib compatibles con el modelo).
 La aplicación publicada requiere únicamente Dash, Plotly y Gunicorn.
 La interfaz y las gráficas usan IBM Plex Sans. El archivo variable latino se
@@ -59,7 +60,7 @@ sus recursos. El enlace «Leer informe completo» abre `/informe/`.
 
 El `Dockerfile` escucha en `0.0.0.0:$PORT`. `data/` contiene exclusivamente
 agregados publicables, y `.gcloudignore`/`.dockerignore` excluyen microdatos,
-notebooks, artefactos de inferencia y el generador. El servicio propuesto
+notebooks, artefactos de inferencia y el generador. El servicio vigente
 `dataviz-salud-atlantico` es distinto del servicio académico existente `dash`.
 El despliegue desde código fuente y el uso de `PORT` siguen la
 [documentación de Cloud Run](https://docs.cloud.google.com/run/docs/deployment-options-for-services)
@@ -78,12 +79,11 @@ disponible en [Google Cloud Run](https://dataviz-salud-atlantico-409319239507.us
 Tras actualizarlo, compruebe `/health`, `/informe/` y los tres paneles. Cloud
 Run reserva algunas rutas terminadas en `z`, por lo que se usa `/health`.
 
-Si se usa **Cloud Shell**, suba `entregables/dash_salud_cloud_run.zip` desde este
-equipo y ejecute:
+Si se usa **Cloud Shell**, clone este repositorio y ejecute:
 
 ```bash
-unzip dash_salud_cloud_run.zip
-cd dash_salud
+git clone https://github.com/acarvajalb21/EDAPYTHON.git
+cd EDAPYTHON/dash_salud
 bash deploy_cloud_shell.sh
 ```
 
