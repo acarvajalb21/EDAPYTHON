@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.csv
+*.joblib
+*.pkl
+*.ipynb
+*.zip
+generar_datos.py
+pruebas.py
+deploy_cloud_run.ps1
+deploy_cloud_shell.sh
+README.md
+.venv/
+.git/

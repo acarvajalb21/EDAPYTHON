@@ -8,6 +8,10 @@ dashboard/.venv/
 
 datos/*.CSV
 datos/*.csv
+**/CNPV2018_*.CSV
+**/CNPV2018_*.csv
+**/.venv/
+**/.r-lib/
 salidas/*.CSV
 salidas/*.csv
 

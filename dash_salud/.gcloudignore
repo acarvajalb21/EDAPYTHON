@@ -1,0 +1,11 @@
+.git/
+__pycache__/
+*.pyc
+*.csv
+*.joblib
+*.pkl
+*.ipynb
+*.zip
+generar_datos.py
+pruebas.py
+.venv/
