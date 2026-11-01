@@ -5,16 +5,17 @@ from __future__ import annotations
 from dash import dcc
 
 from dash_salud.app import (
-    ATLANTICO_MUNICIPIOS, COVERAGE, EDA, EXACT, FEATURE_NAMES, MODEL, app, composition_figure, coverage_for, curve_figure,
-    empty_figure, filter_cube, fmt_int, fmt_pct, reference_aggregate, safe_to_rate,
-    threshold_metrics, threshold_row, update_explore, update_threshold,
+    ATLANTICO_MUNICIPIOS, CONTENIDO, COVERAGE, EDA, EXACT, FEATURE_NAMES, MODEL, NOMBRE, app, composition_figure, coverage_for,
+    curve_figure, empty_figure, filter_cube, fmt_int, fmt_pct, reference_aggregate, safe_to_rate,
+    threshold_metrics, threshold_row, update_comparar, update_explore, update_threshold,
 )
 
 
 def client_assets_ok() -> bool:
     client = app.server.test_client()
     return all(client.get(f"/assets/{name}").status_code == 200 for name in
-               ("relato.js", "relato.css", "relato_datos.json", "fonts/fraunces-latin-wght-normal.woff2"))
+               ("relato.js", "relato.css", "relato_datos.json", "contenido.css",
+                "fonts/bricolage-grotesque-latin-wght-normal.woff2", "fonts/plus-jakarta-sans-latin-wght-normal.woff2"))
 
 
 def run() -> None:
@@ -100,12 +101,24 @@ def run() -> None:
 
     components = list(walk(app.layout))
     nav = next(item for item in components if getattr(item, "id", None) == "nav")
-    assert [tab.label for tab in nav.children] == ["Proyecto", "EDA", "Modelo y método"]
+    assert [tab.label for tab in nav.children] == [seccion["etiqueta"] for seccion in CONTENIDO["secciones"]]
+    assert len(nav.children) == 9
     text = " ".join(item.children for item in components if isinstance(getattr(item, "children", None), str))
-    for phrase in ("Entender cómo varía la ruta declarada de atención",
-                   "Tres objetivos concretos", "¿A quién representan estas cifras?",
-                   "Piojó no aparece en el selector", "Piojó no aparece en esta vista"):
+    for phrase in ("Pregunta de investigación", "Objetivos específicos", "2. Qué significa acceso",
+                   "Piojó no aparece en el selector", "Referencias", "Las 28 variables del modelo"):
         assert phrase in text
+    assert "DATAVIZ" not in text and NOMBRE in text
+    for variable in CONTENIDO["explorar"]["variables"]:
+        assert all(c["n"] >= 100 and c["sin_formal"] >= 10 and c["n"] - c["sin_formal"] >= 10
+                   and c["n"] % 10 == 0 and c["sin_formal"] % 10 == 0 for c in variable["categorias"])
+    # La asociación del informe se reproduce con las tablas publicadas.
+    valores = {v["id"]: v["v"] for v in CONTENIDO["explorar"]["variables"]}
+    assert (valores["edad"], valores["municipio"]) == ("0,163", "0,085")
+    comparado = update_comparar("municipio")
+    assert comparado[2]["height"] == f"{int(comparado[1].layout.height)}px"
+    # El contenido de las secciones no presenta la clase como atención negada ni pruebas de significancia.
+    plano = str(CONTENIDO).lower()
+    assert "p-valor" not in plano and "barrera causal" not in plano and "significativ" not in plano
     assert any(getattr(item, "id", None) == "relato" for item in components)
     assert client_assets_ok()
     slider = next(item for item in components if getattr(item, "id", None) == "threshold")
@@ -116,15 +129,14 @@ def run() -> None:
     assert len(graphs) >= 9
     assert all(item.style["height"].endswith("px") for item in graphs)
     assert all(item.style["width"] == "100%" for item in graphs)
-    assert all("IBM Plex Sans" in item.figure.layout.font.family for item in graphs if item.figure is not None)
+    assert all("Plus Jakarta Sans" in item.figure.layout.font.family for item in graphs if item.figure is not None)
     dynamic = update_explore([], "Todos", "Todos", "Todos", "Todos", "tasa")
     assert dynamic[4]["height"] == f"{int(dynamic[3].layout.height)}px"
-    assert "IBM Plex Sans" in dynamic[3].layout.font.family
+    assert "Plus Jakarta Sans" in dynamic[3].layout.font.family
 
     client = app.server.test_client()
     assert client.get("/").status_code == 200
-    assert b'ibm-plex-sans-latin-variable.woff2' in client.get("/").data
-    assert client.get("/assets/fonts/ibm-plex-sans-latin-variable.woff2").status_code == 200
+    assert b"plus-jakarta-sans-latin-wght-normal.woff2" in client.get("/").data
     assert client.get("/health").json["status"] == "ok"
     assert client.get("/_dash-layout").status_code == 200
     assert client.get("/informe/").status_code == 200

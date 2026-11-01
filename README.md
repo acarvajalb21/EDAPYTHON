@@ -1,10 +1,10 @@
-# DATAVIZ · Salud en el Atlántico — Dash y modelo
+# Salud en el Atlántico — Dash y modelo
 
 Proyecto de Alejandro Carvajal y Mateo Chang sobre respuestas de salud del CNPV 2018 en el Atlántico. **Las carpetas vigentes son [`dash_salud/`](dash_salud/README.md) y [`ml_salud/`](ml_salud/README.md).** El [informe Bookdown actual](https://github.com/acarvajalb21/EDAR) y su [versión HTML](https://acarvajalb21.github.io/EDAR/) están en el repositorio EDAR.
 
 ## Qué se entrega
 
-- [`dash_salud/`](dash_salud/README.md): tablero Dash de tres vistas: Proyecto, EDA y Modelo y método. `data/` contiene solo agregados preparados para publicación; `informe/` es una copia HTML del Bookdown integrada en la app. Incluye Dockerfile, scripts de despliegue y pruebas.
+- [`dash_salud/`](dash_salud/README.md): tablero Dash de nueve secciones, de Introducción a Conclusiones. `data/` contiene solo agregados preparados para publicación; `informe/` es una copia HTML del Bookdown integrada en la app. Incluye Dockerfile, scripts de despliegue y pruebas.
 - [`ml_salud/`](ml_salud/README.md): pipeline reproducible, modelo vigente (versión 2), métricas y auditorías. El [informe técnico](ml_salud/resultados/INFORME_MODELO.md) y el [protocolo de la versión 2](ml_salud/experimento_contexto/PROTOCOLO.md) documentan la evaluación y sus límites. La versión 1 se conserva en `ml_salud/resultados_v1/` y su [auditoría de octubre de 2026](ml_salud/experimentos_2026_10/INFORME_AUDITORIA.md) sigue disponible.
 - [`Modelo_acceso_salud_Atlantico_CNPV2018.ipynb`](Modelo_acceso_salud_Atlantico_CNPV2018.ipynb): cuaderno Jupyter que documenta el modelo de principio a fin. Entrena los candidatos con los parámetros seleccionados, reproduce el modelo guardado y evalúa sus errores. Sus salidas guardadas solo contienen agregados.
 - [Aplicación Shiny](https://shiny-salud-atlantico-409319239507.us-east1.run.app/): versión en R con los mismos agregados y reglas de protección. Su código está en la carpeta `shiny_salud/` de EDAR.
