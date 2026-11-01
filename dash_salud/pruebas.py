@@ -14,8 +14,8 @@ from dash_salud.app import (
 def client_assets_ok() -> bool:
     client = app.server.test_client()
     return all(client.get(f"/assets/{name}").status_code == 200 for name in
-               ("relato.js", "relato.css", "relato_datos.json", "contenido.css",
-                "fonts/bricolage-grotesque-latin-wght-normal.woff2", "fonts/plus-jakarta-sans-latin-wght-normal.woff2"))
+               ("relato.js", "relato.css", "relato_datos.json", "tema.css", "tema_dash.css",
+                "fonts/bricolage-grotesque-latin-wght-normal.woff2", "fonts/atkinson-next-latin-wght-normal.woff2"))
 
 
 def run() -> None:
@@ -49,20 +49,20 @@ def run() -> None:
     assert len(composition.data) == 2
     assert all(len(trace.y) == 2 and all(value is not None for value in trace.y)
                for trace in composition.data)
-    assert "toda la cohorte" in note
+    assert "todas las personas estudiadas" in note
     _, filtered_note = composition_figure(all_rows, ["Baranoa"], "Todos", "Todos", "Todos", "Todos")
-    assert "cruces publicables" in filtered_note
+    assert "dentro del filtro" in filtered_note
     assert update_explore([], "Todos", "Todos", "Todos", "Todos", "tasa")[3] is not None
     assert update_explore(["Piojó"], "Todos", "Todos", "Todos", "Todos", "tasa")[3] is not None
     assert len(ATLANTICO_MUNICIPIOS) == 23
     assert {row["municipio"] for row in EDA["cube"] + EDA["municipal_overview"]} <= set(ATLANTICO_MUNICIPIOS)
     # Sin celdas publicables no se muestra «≈ 0» como si no hubiera personas.
     empty = update_explore([], "Mujer", "0–19", "Centros poblados y rural disperso", "Con dificultad funcional", "tasa")
-    assert "sin-datos" in empty[1][0].className and "Ningún cruce" in empty[0].children[1].children
+    assert "sin-datos" in empty[1][0].className and "Ningún grupo" in empty[0].children[1].children
     # Una tasa oculta remite al agregado publicado aparte, con su propio denominador.
     usiacuri = next(row for row in EDA["municipal_overview"] if row["municipio"] == "Usiacurí")
     hidden = update_explore(["Usiacurí"], "Todos", "Todos", "Todos", "Todos", "tasa")
-    assert "oculta" in hidden[1][0].className and "no permite mostrar una tasa" in str(hidden[0].children[0])
+    assert "oculta" in hidden[1][0].className and "no permite mostrar un porcentaje" in str(hidden[0].children[0])
     assert fmt_int(usiacuri["n"]) in hidden[2].children
     assert fmt_pct(usiacuri["sin_formal"] / usiacuri["n"]) in hidden[2].children
     rural = [row for row in EDA["zone_sex_summary"] if row["zona"] == "Centros poblados y rural disperso"]
@@ -73,7 +73,7 @@ def run() -> None:
     assert reference_aggregate(["Usiacurí"], "Hombre", "Todos", "Todos", "Todos") is None
     assert reference_aggregate([], "Todos", "65+", "Todos", "Todos") is None
     assert "<br>" in empty_figure("Cobertura o tamaño insuficiente para comparar municipios").layout.annotations[0].text
-    assert all("recall" not in trace.name.lower() for trace in curve_figure().data)
+    assert all("recall" not in trace.name.lower() for trace in curve_figure("pr").data)
     threshold = MODEL["metadata"]["chosen_threshold"]
     row = threshold_row(threshold)
     assert {key: row[key] for key in ("tn", "fp", "fn", "tp")} == MODEL["models"]["hist_gradient_boosting"]["test"]["confusion"]
@@ -105,9 +105,9 @@ def run() -> None:
     assert len(nav.children) == 9
     text = " ".join(item.children for item in components if isinstance(getattr(item, "children", None), str))
     for phrase in ("Pregunta de investigación", "Objetivos específicos", "2. Qué significa acceso",
-                   "Piojó no aparece en el selector", "Referencias", "Las 28 variables del modelo"):
+                   "Referencias", "Las 28 variables del modelo", "Por qué algunos resultados no aparecen"):
         assert phrase in text
-    assert "DATAVIZ" not in text and NOMBRE in text
+    assert "DATAVIZ" not in text and app.title == NOMBRE
     for variable in CONTENIDO["explorar"]["variables"]:
         assert all(c["n"] >= 100 and c["sin_formal"] >= 10 and c["n"] - c["sin_formal"] >= 10
                    and c["n"] % 10 == 0 and c["sin_formal"] % 10 == 0 for c in variable["categorias"])
@@ -129,14 +129,14 @@ def run() -> None:
     assert len(graphs) >= 9
     assert all(item.style["height"].endswith("px") for item in graphs)
     assert all(item.style["width"] == "100%" for item in graphs)
-    assert all("Plus Jakarta Sans" in item.figure.layout.font.family for item in graphs if item.figure is not None)
+    assert all("Atkinson Hyperlegible Next" in item.figure.layout.font.family for item in graphs if item.figure is not None)
     dynamic = update_explore([], "Todos", "Todos", "Todos", "Todos", "tasa")
     assert dynamic[4]["height"] == f"{int(dynamic[3].layout.height)}px"
-    assert "Plus Jakarta Sans" in dynamic[3].layout.font.family
+    assert "Atkinson Hyperlegible Next" in dynamic[3].layout.font.family
 
     client = app.server.test_client()
     assert client.get("/").status_code == 200
-    assert b"plus-jakarta-sans-latin-wght-normal.woff2" in client.get("/").data
+    assert b"atkinson-next-latin-wght-normal.woff2" in client.get("/").data
     assert client.get("/health").json["status"] == "ok"
     assert client.get("/_dash-layout").status_code == 200
     assert client.get("/informe/").status_code == 200

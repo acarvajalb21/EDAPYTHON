@@ -4,7 +4,7 @@
 
 Autores: Alejandro Carvajal y Mateo Chang
 
-Este libro describe el acceso observado a atención formal entre las personas censadas en el Atlántico que reportaron un problema de salud durante los 30 días previos y cuya respuesta puede clasificarse. La medida se construye con el tratamiento principal declarado y la atención recibida en la entidad de seguridad social. No equivale a afiliación ni a cobertura de toda la población.
+Este libro describe el acceso observado a atención formal entre las personas censadas en el Atlántico que reportaron un problema de salud durante los 30 días previos y cuya respuesta puede clasificarse. La medida se construye con el tratamiento principal declarado y la atención recibida en la entidad de seguridad social. No equivale a afiliación ni a cobertura de toda la población. Los tableros y el informe llaman «dentro de la ruta formal» a quienes este análisis clasifica con acceso formal, y «fuera de la ruta formal» a los demás.
 
 ```{admonition} Pregunta de investigación
 ¿Cómo varía el acceso a atención formal entre estas personas según sus características funcionales, sociodemográficas, habitacionales y territoriales?
@@ -18,4 +18,4 @@ Los CSV censales originales no se publican en este repositorio. Los resultados, 
 
 Seleccione «Análisis exploratorio completo» en el menú para consultar el procedimiento y los resultados.
 
-Para explorar los resultados con filtros por municipio y características de las personas, abra el [Dash interactivo del EDA en Python](https://eda-salud-atlantico-python-409319239507.us-east1.run.app/).
+Para explorar los resultados con filtros por municipio y características de las personas, abra el [tablero interactivo en Dash](https://dataviz-salud-atlantico-409319239507.us-east1.run.app/).
