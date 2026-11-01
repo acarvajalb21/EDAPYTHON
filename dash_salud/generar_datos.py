@@ -16,14 +16,16 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import average_precision_score, confusion_matrix, precision_recall_curve, roc_curve
 
+from ml_salud.contexto import FEATURES_V2
 from ml_salud.entrenar import group_ids, load_data, split_three
-from ml_salud.esquema import FEATURES
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATA = Path.home() / "OneDrive" / "Documents" / "PROYECTO_DISCAPACIDAD" / "data"
 OUT = Path(__file__).resolve().parent / "data"
 REPORT = ROOT / "ml_salud" / "resultados" / "resultados.json"
+REPORT_V1 = ROOT / "ml_salud" / "resultados_v1" / "resultados.json"
+CONTEXT_DIR = ROOT / "ml_salud" / "experimento_contexto" / "salidas"
 AUDIT_DIR = ROOT / "ml_salud" / "experimentos_2026_10" / "salidas"
 MODEL = ROOT / "ml_salud" / "resultados" / "modelo_sin_acceso.joblib"
 
@@ -169,13 +171,17 @@ def sampled_curve(x: np.ndarray, y: np.ndarray, max_points: int = 320) -> list[d
 def make_model(df: pd.DataFrame, report: dict) -> dict:
     audit = json.loads((AUDIT_DIR / "auditoria.json").read_text(encoding="utf-8"))
     extended = json.loads((AUDIT_DIR / "ampliacion.json").read_text(encoding="utf-8"))
-    breach = json.loads((AUDIT_DIR / "brecha_dificultad.json").read_text(encoding="utf-8"))
-    if audit["source_sha256"] != report["source"]["source_sha256"] or extended["selected"] != "referencia":
+    archived = json.loads(REPORT_V1.read_text(encoding="utf-8"))
+    decision = json.loads((CONTEXT_DIR / "decision.json").read_text(encoding="utf-8"))
+    gap = json.loads((CONTEXT_DIR / "brecha.json").read_text(encoding="utf-8"))
+    if audit["source_sha256"] != archived["source"]["source_sha256"] or extended["selected"] != "referencia":
         raise AssertionError("La revisión adicional no corresponde al modelo original")
+    if decision["decision"] != "adoptar":
+        raise AssertionError("El modelo vigente no superó la regla de adopción")
     artifact = joblib.load(MODEL)
     if artifact["source_sha256"] != report["source"]["source_sha256"]:
         raise AssertionError("El modelo y el informe no proceden de los mismos microdatos")
-    x = df[FEATURES]
+    x = df[FEATURES_V2]
     y = df["SIN_ACCESO"].to_numpy(dtype=int)
     groups = group_ids(df)
     _, _, test = split_three(x, y, groups)
@@ -198,6 +204,7 @@ def make_model(df: pd.DataFrame, report: dict) -> dict:
     return {
         "metadata": {
             "target": report["target"],
+            "model_version": report["model_version"],
             "selected_model": report["selected_model"],
             "chosen_threshold": chosen_threshold,
             "test_n": int(len(test)), "test_positive": int(yy.sum()),
@@ -216,11 +223,25 @@ def make_model(df: pd.DataFrame, report: dict) -> dict:
             "original_validation_ap": extended["baseline_validation"]["ap"],
             "best_new_validation_ap": max(row["validation"]["ap"] for row in extended["candidates"]),
             "best_cv_delta_ap_interval_95": extended["paired_validation"]["delta_ap_interval_95"],
-            "recall_difficulty": breach["raw_recall"]["1"],
-            "recall_no_difficulty": breach["raw_recall"]["2"],
-            "age_adjusted_recall_difficulty": breach["age_standardized_recall"]["1"],
-            "age_adjusted_recall_no_difficulty": breach["age_standardized_recall"]["2"],
         },
+        "version_change": {
+            "previous_test_ap": archived["test_metrics"]["hist_gradient_boosting"]["pr_auc"],
+            "previous_validation_ap": decision["validacion"]["modelo_26"]["pr_auc"],
+            "new_validation_ap": decision["validacion"]["modelo_28"]["pr_auc"],
+            "delta_ap_interval_95": decision["comparacion_pareada"]["delta_ap_interval_95"],
+            "previous_unseen_sections_ap": decision["cv_secciones_no_vistas"]["ap_26"],
+            "new_unseen_sections_ap": decision["cv_secciones_no_vistas"]["ap_28"],
+        },
+        "equity": {
+            "recall_difficulty": gap["raw_recall"]["1"],
+            "recall_no_difficulty": gap["raw_recall"]["2"],
+            "age_adjusted_recall_difficulty": gap["age_standardized_recall"]["1"],
+            "age_adjusted_recall_no_difficulty": gap["age_standardized_recall"]["2"],
+            "recall_60_plus": gap["recall_60_plus"],
+            "recall_under_60": gap["recall_under_60"],
+        },
+        "same_flagged": gap["same_flagged_comparison"],
+        "prioritization": report["prioritization_test"],
         "thresholds": threshold_rows,
         "roc_curve": sampled_curve(fpr, tpr),
         "pr_curve": sampled_curve(recall, precision),
@@ -233,7 +254,7 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=OUT)
     args = parser.parse_args()
     report = json.loads(REPORT.read_text(encoding="utf-8"))
-    df, source = load_data(args.data_dir)
+    df, source = load_data(args.data_dir, with_context=True)
     if source["source_sha256"] != report["source"]["source_sha256"]:
         raise AssertionError("Los CSV cambiaron desde la evaluación del modelo")
     eda = make_eda(df, source)

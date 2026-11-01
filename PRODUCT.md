@@ -42,9 +42,9 @@ El análisis aplica una regla operativa explícita a respuestas censales de una 
 
 - `README.md` describe el alcance, cifras principales, publicación y límites.
 - `dash_salud/README.md`, `dash_salud/app.py` y `dash_salud/data/` documentan la interfaz y sus agregados publicables.
-- `bookdown_salud/index.Rmd` y los capítulos del libro contienen la explicación extensa del análisis.
+- El repositorio [EDAR](https://github.com/acarvajalb21/EDAR) (`index.Rmd` y capítulos `01`–`07`) contiene la explicación extensa del análisis; `dash_salud/informe/` es su copia HTML integrada en el tablero.
 - `ml_salud/resultados/INFORME_MODELO.md` registra la metodología, métricas y límites del modelo.
-- `entregables/tablero_publicado.png` muestra el tablero publicado.
+- El [tablero publicado en Cloud Run](https://dataviz-salud-atlantico-409319239507.us-east1.run.app/) muestra la revisión desplegada, que puede ser anterior a este repositorio.
 
 ## Product Principles
 
