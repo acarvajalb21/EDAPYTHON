@@ -5,7 +5,8 @@ from __future__ import annotations
 from dash import dcc
 
 from dash_salud.app import (
-    COVERAGE, EDA, EXACT, MODEL, app, composition_figure, coverage_for, filter_cube, safe_to_rate,
+    ATLANTICO_MUNICIPIOS, COVERAGE, EDA, EXACT, FEATURE_NAMES, MODEL, app, composition_figure, coverage_for, curve_figure,
+    empty_figure, filter_cube, fmt_int, fmt_pct, reference_aggregate, safe_to_rate,
     threshold_metrics, threshold_row, update_explore, update_threshold,
 )
 
@@ -46,6 +47,25 @@ def run() -> None:
     assert "cruces publicables" in filtered_note
     assert update_explore([], "Todos", "Todos", "Todos", "Todos", "tasa")[2] is not None
     assert update_explore(["Piojó"], "Todos", "Todos", "Todos", "Todos", "tasa")[2] is not None
+    assert len(ATLANTICO_MUNICIPIOS) == 23
+    assert {row["municipio"] for row in EDA["cube"] + EDA["municipal_overview"]} <= set(ATLANTICO_MUNICIPIOS)
+    # Sin celdas publicables no se muestra «≈ 0» como si no hubiera personas.
+    empty = update_explore([], "Mujer", "0–19", "Centros poblados y rural disperso", "Con dificultad funcional", "tasa")
+    assert empty[0][0].children[1].children == "Sin cruces publicables"
+    # Una tasa oculta remite al agregado publicado aparte, con su propio denominador.
+    usiacuri = next(row for row in EDA["municipal_overview"] if row["municipio"] == "Usiacurí")
+    hidden = update_explore(["Usiacurí"], "Todos", "Todos", "Todos", "Todos", "tasa")
+    assert hidden[0][1].children[1].children == "Cobertura insuficiente"
+    assert fmt_int(usiacuri["n"]) in hidden[1][-1].children
+    assert fmt_pct(usiacuri["sin_formal"] / usiacuri["n"]) in hidden[1][-1].children
+    rural = [row for row in EDA["zone_sex_summary"] if row["zona"] == "Centros poblados y rural disperso"]
+    rural_note = update_explore([], "Todos", "Todos", "Centros poblados y rural disperso", "Todos", "tasa")[1]
+    assert fmt_int(sum(row["n"] for row in rural)) in rural_note[-1].children
+    assert len(update_explore([], "Todos", "Todos", "Todos", "Todos", "tasa")[1]) == 1
+    assert reference_aggregate(["Usiacurí"], "Hombre", "Todos", "Todos", "Todos") is None
+    assert reference_aggregate([], "Todos", "65+", "Todos", "Todos") is None
+    assert "<br>" in empty_figure("Cobertura o tamaño insuficiente para comparar municipios").layout.annotations[0].text
+    assert all("recall" not in trace.name.lower() for trace in curve_figure().data)
     threshold = MODEL["metadata"]["chosen_threshold"]
     row = threshold_row(threshold)
     assert {key: row[key] for key in ("tn", "fp", "fn", "tp")} == MODEL["models"]["hist_gradient_boosting"]["test"]["confusion"]
@@ -54,6 +74,13 @@ def run() -> None:
     audit = MODEL["audit_2026"]
     assert audit["selected"] == "referencia" and audit["alternatives"] == 9
     assert audit["best_cv_delta_ap_interval_95"][0] < 0 < audit["best_cv_delta_ap_interval_95"][1]
+    assert MODEL["metadata"]["model_version"] == 2
+    change = MODEL["version_change"]
+    assert change["delta_ap_interval_95"][0] > 0
+    assert change["new_validation_ap"] - change["previous_validation_ap"] >= 0.010
+    assert change["new_unseen_sections_ap"] - change["previous_unseen_sections_ap"] >= 0.010
+    assert [row["fraction"] for row in MODEL["prioritization"]] == [0.05, 0.10, 0.20]
+    assert all(FEATURE_NAMES.get(row["feature"]) for row in MODEL["importance"][:8])
 
     def walk(component):
         if isinstance(component, (list, tuple)):
@@ -69,9 +96,14 @@ def run() -> None:
     assert [tab.label for tab in nav.children] == ["Proyecto", "EDA", "Modelo y método"]
     text = " ".join(item.children for item in components if isinstance(getattr(item, "children", None), str))
     for phrase in ("¿Qué ruta de atención se declaró", "Entender cómo varía la ruta declarada de atención",
-                   "Tres objetivos concretos", "¿A quién representan estas cifras?", "Explora los datos"):
+                   "Tres objetivos concretos", "¿A quién representan estas cifras?", "Explora los datos",
+                   "Piojó no aparece en el selector", "Piojó no aparece en esta vista"):
         assert phrase in text
     assert any(getattr(item, "id", None) == "go-eda" for item in components)
+    slider = next(item for item in components if getattr(item, "id", None) == "threshold")
+    assert all(not label for value, label in slider.marks.items() if value != threshold and abs(value - threshold) < 0.03)
+    municipio_filter = next(item for item in components if getattr(item, "id", None) == "f-municipio")
+    assert municipio_filter.labels["select_all"] == "Seleccionar todos"
     graphs = [item for item in components if isinstance(item, dcc.Graph)]
     assert len(graphs) >= 9
     assert all(item.style["height"].endswith("px") for item in graphs)
@@ -89,6 +121,7 @@ def run() -> None:
     assert client.get("/_dash-layout").status_code == 200
     assert client.get("/informe/").status_code == 200
     assert client.get("/informe/modelo.html").status_code == 200
+    assert b'id="modelo-contexto-2026"' in client.get("/informe/modelo.html").data
     assert client.get("/informe/figures/curvas_modelo.png").status_code == 200
     assert client.get("/informe/figures/brecha_dificultad_2026.png").status_code == 200
     print("Dash y datos publicables: verificaciones satisfactorias")

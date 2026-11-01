@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import textwrap
 from collections import defaultdict
 from pathlib import Path
 
@@ -20,13 +21,18 @@ SOURCE = MODEL["models"]["hist_gradient_boosting"]["test"]
 EXACT = {"n": EDA["metadata"]["total_labeled_exact"], "sin_formal": EDA["metadata"]["no_access_exact"]}
 COVERAGE = {tuple(row["key"]): row["coverage_floor_5pct"] for row in EDA.get("coverage_index", [])}
 
-NAVY = "#17324D"
-TEAL = "#0A8D88"
-CORAL = "#E88969"
-INK = "#193047"
-MUTED = "#667789"
-GRID = "#E7ECEE"
-CREAM = "#F7F8F5"
+# Tokens del sistema «Papel censal». Arcilla significa siempre «fuera de la ruta formal».
+TINTA = "#13232C"
+TINTA_MEDIA = "#465660"
+TINTA_SUAVE = "#5F6D75"
+HILO = "#DDD8CB"
+HOJA = "#FDFCF9"
+RIO = "#00739A"
+ARCILLA = "#C4552D"
+ANIL = "#3F5AA6"
+OCRE = "#B57A08"
+REFERENCIA = "#9A978C"
+BASE = "#C9C4B6"
 AGE_ORDER = EDA["metadata"]["age_bands"]
 RULE_NOTE = "Cruces publicables del censo de 2018; recuentos redondeados a 5. Se omiten celdas pequeñas. Las gráficas basadas en esos cruces ocultan tasas con menos de 80 % de cobertura o base aproximada menor de 200."
 MODEL_NAMES = {
@@ -41,7 +47,23 @@ FEATURE_NAMES = {
     "HA_TOT_PER": "Personas en el hogar", "CONDICION_FISICA": "Dificultad funcional",
     "UA_CLASE": "Clase de asentamiento", "P_SEXO": "Sexo reportado",
     "V_MAT_PISO": "Material del piso", "P_PARENTESCOR": "Parentesco",
-    "VF_INTERNET": "Internet en la vivienda",
+    "VF_INTERNET": "Internet en la vivienda", "V_MAT_PARED": "Material de las paredes",
+    "HOGAR_OTROS_ENFERMOS": "Otros enfermos en el hogar",
+    "SECCION_PCT_ENFERMOS": "Enfermos en la sección censal",
+}
+NUEVAS = {"HOGAR_OTROS_ENFERMOS", "SECCION_PCT_ENFERMOS"}
+# Los 23 municipios DIVIPOLA del Atlántico; mismos nombres que generar_datos.MUNICIPIOS.
+ATLANTICO_MUNICIPIOS = (
+    "Barranquilla", "Baranoa", "Campo de la Cruz", "Candelaria", "Galapa", "Juan de Acosta",
+    "Luruaco", "Malambo", "Manatí", "Palmar de Varela", "Piojó", "Polonuevo", "Ponedera",
+    "Puerto Colombia", "Repelón", "Sabanagrande", "Sabanalarga", "Santa Lucía", "Santo Tomás",
+    "Soledad", "Suan", "Tubará", "Usiacurí",
+)
+DROPDOWN_LABELS = {
+    "select_all": "Seleccionar todos", "deselect_all": "Quitar todos",
+    "selected_count": "{num_selected} seleccionados", "search": "Buscar",
+    "clear_search": "Borrar búsqueda", "clear_selection": "Quitar selección",
+    "no_options_found": "Sin coincidencias",
 }
 
 
@@ -50,17 +72,26 @@ def fmt_int(value: int | float) -> str:
 
 
 def fmt_pct(value: float, digits: int = 1) -> str:
-    return f"{100 * value:.{digits}f}".replace(".", ",") + " %"
+    # Espacio no separable: el signo % no queda solo en otra línea.
+    return f"{100 * value:.{digits}f}".replace(".", ",") + " %"
+
+
+def omitted_municipios_sentence(present, place: str, reason: str) -> str:
+    missing = [name for name in sorted(ATLANTICO_MUNICIPIOS) if name not in set(present)]
+    if not missing:
+        return ""
+    verb = "no aparece" if len(missing) == 1 else "no aparecen"
+    return f" {', '.join(missing)} {verb} {place}: {reason}."
 
 
 def figure_base(fig: go.Figure, height: int = 370, margin: dict | None = None) -> go.Figure:
     fig.update_layout(
-        height=height, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="IBM Plex Sans, Segoe UI, Arial, sans-serif", color=INK, size=13),
+        height=height, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", separators=",.",
+        font=dict(family="IBM Plex Sans, Segoe UI, Arial, sans-serif", color=TINTA_MEDIA, size=13),
         margin=margin or dict(l=32, r=25, t=30, b=42),
-        hoverlabel=dict(bgcolor=NAVY, font_color="white", font_family="IBM Plex Sans, Segoe UI, Arial, sans-serif"),
-        xaxis=dict(gridcolor=GRID, zeroline=False),
-        yaxis=dict(gridcolor=GRID, zeroline=False),
+        hoverlabel=dict(bgcolor=TINTA, font_color="white", font_family="IBM Plex Sans, Segoe UI, Arial, sans-serif"),
+        xaxis=dict(gridcolor=HILO, zeroline=False),
+        yaxis=dict(gridcolor=HILO, zeroline=False),
         legend=dict(orientation="h", y=-0.22),
     )
     return fig
@@ -104,10 +135,10 @@ def graph(id_: str | None = None, figure: go.Figure | None = None) -> dcc.Graph:
 def action_breakdown() -> html.Div:
     labels = EDA["metadata"]["label_breakdown_exact"]
     routes = [
-        ("EPS y recibió atención", labels["eps_atendido"], "route-teal"),
-        ("Otra acción principal o ninguna", labels["otras_acciones_o_ninguna"], "route-navy"),
-        ("Médico particular", labels["medico_particular"], "route-mint"),
-        ("EPS sin atención", labels["eps_no_atendido"], "route-coral"),
+        ("EPS y recibió atención", labels["eps_atendido"], "route-rio"),
+        ("Otra acción principal o ninguna", labels["otras_acciones_o_ninguna"], "route-arcilla"),
+        ("Médico particular", labels["medico_particular"], "route-rio"),
+        ("EPS sin atención", labels["eps_no_atendido"], "route-arcilla"),
     ]
     return html.Div([
         html.P(f"De {fmt_int(EXACT['n'])} personas con respuesta clasificable", className="route-denominator"),
@@ -130,7 +161,7 @@ def municipal_overview_figure() -> go.Figure:
     fig = go.Figure(go.Bar(
         x=[100 * r["sin_formal"] / r["n"] for r in records],
         y=[r["municipio"] for r in records], orientation="h",
-        marker=dict(color=[r["sin_formal"] / r["n"] for r in records], colorscale=[[0, "#A8D8D3"], [1, TEAL]], showscale=False),
+        marker=dict(color=ARCILLA),
         customdata=[[r["n"], r["sin_formal"]] for r in records],
         hovertemplate="%{y}<br>%{x:.1f} % con acción principal fuera de ruta formal<br>Base aproximada: %{customdata[0]:,}<extra></extra>",
     ))
@@ -171,9 +202,27 @@ def safe_to_rate(n: int, coverage: int | None) -> bool:
     return n >= 200 and coverage is not None and coverage >= 80
 
 
+def reference_aggregate(municipios, sexo, edad, zona, dificultad) -> tuple[str, dict, str] | None:
+    """Agregado publicado aparte que describe la misma selección sin cruces adicionales."""
+    if edad != "Todos" or dificultad != "Todos":
+        return None
+    if municipios and len(municipios) == 1 and sexo == "Todos" and zona == "Todos":
+        row = next((r for r in EDA["municipal_overview"] if r["municipio"] == municipios[0]), None)
+        return (municipios[0], row, "el panorama municipal de la vista Proyecto") if row else None
+    if not municipios:
+        rows = [r for r in EDA["zone_sex_summary"]
+                if (sexo == "Todos" or r["sexo"] == sexo) and (zona == "Todos" or r["zona"] == zona)]
+        group = " · ".join(value for value in (sexo, zona) if value != "Todos") or "Toda la cohorte"
+        return (group, {"n": sum(r["n"] for r in rows), "sin_formal": sum(r["sin_formal"] for r in rows)},
+                "la comparación por sexo y zona de esta página")
+    return None
+
+
 def empty_figure(message: str = "No hay cruces publicables con estos filtros") -> go.Figure:
     fig = go.Figure()
-    fig.add_annotation(text=message, showarrow=False, font=dict(color=MUTED, size=15))
+    # Se parte en líneas cortas para que el aviso no se recorte en pantallas estrechas.
+    fig.add_annotation(text="<br>".join(textwrap.wrap(message, 34)), showarrow=False,
+                       font=dict(color=TINTA_SUAVE, size=15))
     fig.update_xaxes(visible=False)
     fig.update_yaxes(visible=False)
     return figure_base(fig)
@@ -197,7 +246,7 @@ def ranked_figure(rows: list[dict], metric: str, sexo, edad, zona, dificultad) -
         xlabel = "Porcentaje aproximado (%)"
         hover = "%{y}<br>%{x:.1f} % aprox.<br>Base: %{customdata[0]:,}<extra></extra>"
     fig = go.Figure(go.Bar(x=x, y=[r["municipio"] for r in data], orientation="h",
-                           marker_color=TEAL, customdata=[[r["n"]] for r in data],
+                           marker_color=ARCILLA, customdata=[[r["n"]] for r in data],
                            hovertemplate=hover))
     fig.update_layout(xaxis_title=xlabel, yaxis_title="")
     return figure_base(fig, height=max(360, 55 + 24 * len(data)), margin=dict(l=130, r=22, t=20, b=47))
@@ -211,12 +260,12 @@ def age_figure(rows: list[dict], municipios, sexo, zona, dificultad) -> go.Figur
     if not data:
         return empty_figure("Cobertura o tamaño insuficiente para comparar edades")
     fig = go.Figure()
-    for label, color in [("Sin dificultad funcional", TEAL), ("Con dificultad funcional", CORAL)]:
+    for label, color in [("Sin dificultad funcional", ANIL), ("Con dificultad funcional", OCRE)]:
         group = {r["edad"]: r for r in data if r["dificultad"] == label}
         keys = [age for age in AGE_ORDER if age in group]
         if keys:
             fig.add_scatter(x=keys, y=[100 * group[age]["sin_formal"] / group[age]["n"] for age in keys],
-                            mode="lines+markers", name=label, line=dict(color=color, width=3), marker=dict(size=9),
+                            mode="lines+markers", name=label, line=dict(color=color, width=2.5), marker=dict(size=10, line=dict(color=HOJA, width=2)),
                             customdata=[[group[age]["n"]] for age in keys],
                             hovertemplate="%{x}<br>%{y:.1f} % aprox.<br>Base: %{customdata[0]:,}<extra>" + label + "</extra>")
     fig.update_layout(xaxis_title="Edad", yaxis_title="Porcentaje aproximado (%)")
@@ -247,7 +296,7 @@ def composition_figure(rows: list[dict], municipios, sexo, edad, zona, dificulta
     fig = go.Figure()
     zones = [z for z in ["Cabecera", "Centros poblados y rural disperso"]
              if any(r["zona"] == z for r in data)]
-    for label, color in [("Mujer", CORAL), ("Hombre", TEAL)]:
+    for label, color in [("Mujer", OCRE), ("Hombre", ANIL)]:
         group = {r["zona"]: r for r in data if r["sexo"] == label}
         present = [z for z in zones if z in group]
         if not present:
@@ -267,14 +316,15 @@ def composition_figure(rows: list[dict], municipios, sexo, edad, zona, dificulta
 
 def comparison_figure() -> go.Figure:
     keys = ["baseline", "logistica", "random_forest", "hist_gradient_boosting"]
+    top = max(MODEL["models"][k]["test"]["pr_auc"] for k in keys)
     fig = go.Figure(go.Bar(
         x=[MODEL_NAMES[k] for k in keys],
         y=[MODEL["models"][k]["test"]["pr_auc"] for k in keys],
-        marker_color=["#B7C4CE", "#6BAEAA", "#317C84", TEAL],
-        text=[f"{MODEL['models'][k]['test']['pr_auc']:.3f}" for k in keys],
+        marker_color=[REFERENCIA, BASE, BASE, RIO],
+        text=[f"{MODEL['models'][k]['test']['pr_auc']:.3f}".replace(".", ",") for k in keys],
         textposition="outside", hovertemplate="%{x}<br>Average Precision: %{y:.3f}<extra></extra>",
     ))
-    fig.update_layout(yaxis_title="Average Precision (AP)", xaxis_title="", yaxis_range=[0, 0.42])
+    fig.update_layout(yaxis_title="Average Precision (AP)", xaxis_title="", yaxis_range=[0, top * 1.2])
     return figure_base(fig, height=350, margin=dict(l=45, r=25, t=25, b=80))
 
 
@@ -283,13 +333,13 @@ def curve_figure() -> go.Figure:
     roc = MODEL["roc_curve"]
     pr = MODEL["pr_curve"]
     fig.add_scatter(x=[r["x"] for r in roc], y=[r["y"] for r in roc], mode="lines",
-                    name="ROC", line=dict(color=TEAL, width=3), visible=True)
-    fig.add_scatter(x=[0, 1], y=[0, 1], mode="lines", name="Azar", line=dict(color="#A7B2BC", dash="dash"), visible=True)
+                    name="ROC", line=dict(color=RIO, width=2.5), visible=True)
+    fig.add_scatter(x=[0, 1], y=[0, 1], mode="lines", name="Azar", line=dict(color=REFERENCIA, width=1.5), visible=True)
     fig.add_scatter(x=[r["x"] for r in pr], y=[r["y"] for r in pr], mode="lines",
-                    name="Precisión–recall", line=dict(color=CORAL, width=3), visible=False)
+                    name="Precisión–sensibilidad", line=dict(color=RIO, width=2.5), visible=False)
     base = MODEL["metadata"]["test_positive"] / MODEL["metadata"]["test_n"]
     fig.add_scatter(x=[0, 1], y=[base, base], mode="lines", name="Prevalencia",
-                    line=dict(color="#A7B2BC", dash="dash"), visible=False)
+                    line=dict(color=REFERENCIA, width=1.5), visible=False)
     fig.update_layout(
         updatemenus=[dict(type="buttons", direction="right", x=0, y=1.16,
                           buttons=[dict(label="ROC", method="update", args=[{"visible": [True, True, False, False]}, {"xaxis.title": "1 − especificidad", "yaxis.title": "Sensibilidad"}]),
@@ -303,10 +353,10 @@ def calibration_figure() -> go.Figure:
     bins = MODEL["calibration"]
     fig = go.Figure()
     fig.add_scatter(x=[0, 0.6], y=[0, 0.6], name="Calibración perfecta", mode="lines",
-                    line=dict(color="#A7B2BC", dash="dash"))
+                    line=dict(color=REFERENCIA, width=1.5))
     fig.add_scatter(x=[r["mean_predicted"] for r in bins], y=[r["observed"] for r in bins],
-                    mode="lines+markers", name="Modelo", line=dict(color=TEAL, width=3),
-                    marker=dict(size=8), customdata=[[r["n"]] for r in bins],
+                    mode="lines+markers", name="Modelo", line=dict(color=RIO, width=2.5),
+                    marker=dict(size=9, line=dict(color=HOJA, width=2)), customdata=[[r["n"]] for r in bins],
                     hovertemplate="Predicho: %{x:.1%}<br>Observado: %{y:.1%}<br>Base: %{customdata[0]:,}<extra></extra>")
     fig.update_layout(xaxis_title="Probabilidad predicha media", yaxis_title="Proporción observada",
                       xaxis_tickformat=".0%", yaxis_tickformat=".0%", xaxis_range=[0, 0.6], yaxis_range=[0, 0.6])
@@ -317,10 +367,23 @@ def importance_figure() -> go.Figure:
     data = sorted(MODEL["importance"][:8], key=lambda x: x["mean_ap_drop"])
     fig = go.Figure(go.Bar(x=[r["mean_ap_drop"] for r in data],
                            y=[FEATURE_NAMES.get(r["feature"], r["feature"]) for r in data],
-                           orientation="h", marker_color=TEAL,
+                           orientation="h", marker_color=[RIO if r["feature"] in NUEVAS else BASE for r in data],
                            hovertemplate="%{y}<br>Caída de AP al permutar: %{x:.3f}<extra></extra>"))
     fig.update_layout(xaxis_title="Caída media de AP", yaxis_title="")
     return figure_base(fig, height=355, margin=dict(l=170, r=25, t=15, b=45))
+
+
+def prioritization_table() -> html.Table:
+    rows = MODEL["prioritization"]
+    return html.Table([
+        html.Thead(html.Tr([html.Th(text) for text in
+                            ("Se revisa", "Personas", "De la clase", "Precisión", "Sensibilidad")])),
+        html.Tbody([html.Tr([
+            html.Td(f"{row['fraction'] * 100:.0f} % con mayor puntuación"),
+            html.Td(fmt_int(row["reviewed"])), html.Td(fmt_int(row["positives_found"])),
+            html.Td(fmt_pct(row["precision"])), html.Td(fmt_pct(row["recall"])),
+        ]) for row in rows]),
+    ], className="data-table")
 
 
 def threshold_row(value: float) -> dict:
@@ -342,7 +405,7 @@ def confusion_figure(row: dict) -> go.Figure:
     fig = go.Figure(go.Heatmap(z=z, x=["Ruta formal", "Fuera de ruta formal"],
                                y=["Ruta formal", "Fuera de ruta formal"],
                                text=[[fmt_int(v) for v in line] for line in z], texttemplate="%{text}",
-                               textfont=dict(size=18), colorscale=[[0, "#EDF5F3"], [1, TEAL]], showscale=False,
+                               textfont=dict(size=18), colorscale=[[0, "#EFF4F4"], [1, "#6FAFC4"]], showscale=False,
                                hovertemplate="Real: %{y}<br>Predicho: %{x}<br>%{text} personas<extra></extra>"))
     fig.update_layout(xaxis_title="Predicción", yaxis_title="Dato censal")
     fig.update_yaxes(autorange="reversed")
@@ -421,7 +484,9 @@ def layout_panorama() -> html.Div:
             ], className="insight-card"),
         ], className="two-col uneven"),
         panel("Una vista por municipio", graph(figure=municipal_overview_figure()), "PATRÓN TERRITORIAL",
-              "Se muestran municipios con al menos 100 personas y 10 en cada clase; conteos redondeados a 10 antes de publicarse. Las diferencias pueden reflejar composición demográfica y otras características."),
+              "Se muestran municipios con al menos 100 personas y 10 en cada clase; conteos redondeados a 10 antes de publicarse."
+              + omitted_municipios_sentence([r["municipio"] for r in EDA["municipal_overview"]], "en esta vista", "no alcanza ese mínimo")
+              + " Las diferencias pueden reflejar composición demográfica y otras características."),
         html.P("Para consultar las definiciones, las tablas exactas y las decisiones metodológicas, abre el informe Bookdown desde el enlace superior.", className="source-line"),
         html.P(f"Fuente: microdatos anonimizados del CNPV 2018, DANE. Universo: quienes reportaron problema de salud en los últimos 30 días sin hospitalización. Se excluyeron {fmt_int(flow['unclassifiable'])} respuestas no clasificables. Nombres municipales: DIVIPOLA del DANE.", className="source-line"),
     ], className="page")
@@ -433,7 +498,7 @@ def dropdown(id_: str, label: str, options: list[str], multi: bool = False):
         dcc.Dropdown(id=id_, options=[{"label": v, "value": v} for v in options],
                      value=[] if multi else "Todos", multi=multi, clearable=multi,
                      placeholder="Todos los municipios" if multi else None,
-                     className="filter-control"),
+                     labels=DROPDOWN_LABELS, className="filter-control"),
     ], className="filter")
 
 
@@ -442,7 +507,8 @@ def layout_explorar() -> html.Div:
     return html.Div([
         html.Div([
             html.H2("Explora los datos"),
-            html.P("Compara las respuestas de 2018 por municipio, edad, sexo, zona y dificultad funcional. Los filtros usan cruces publicables; la comparación general por sexo y zona se calcula aparte con grupos amplios."),
+            html.P("Compara las respuestas de 2018 por municipio, edad, sexo, zona y dificultad funcional. Los filtros usan cruces publicables; la comparación general por sexo y zona se calcula aparte con grupos amplios."
+                   + omitted_municipios_sentence(municip, "en el selector", "ninguno de sus cruces cumple las reglas de publicación")),
         ], className="page-intro"),
         html.P([html.Strong("Qué se compara: "), "la proporción cuya acción principal quedó fuera de EPS con atención o médico particular. Al filtrar cambian el grupo, su denominador y la cobertura publicable."], className="eda-definition"),
         html.Div([
@@ -474,6 +540,7 @@ def layout_explorar() -> html.Div:
             dcc.Download(id="download-data"),
             html.Span("El archivo contiene solo celdas publicables y recuentos redondeados.", className="download-note"),
         ], className="download-row"),
+        html.P(RULE_NOTE, className="source-line"),
         html.P(f"Protección de grupos pequeños: {EDA['metadata']['rules']} El cubo publicado cubre {str(EDA['metadata']['coverage_pct']).replace('.', ',')} % del universo clasificable antes de aplicar filtros.", className="source-line"),
     ], className="page")
 
@@ -481,37 +548,47 @@ def layout_explorar() -> html.Div:
 def layout_modelo() -> html.Div:
     chosen = MODEL["metadata"]["chosen_threshold"]
     audit = MODEL["audit_2026"]
+    change = MODEL["version_change"]
+    equity = MODEL["equity"]
     uncertainty = MODEL["uncertainty"]["intervals_95"]
-    marks = {i / 20: (f"{i / 20:.2f}".replace(".", ",") if i % 2 == 0 else "") for i in range(1, 17)}
-    marks[chosen] = "Validado"
+    ap_text = lambda value: f"{value:.3f}".replace(".", ",")
+    baseline_ap = MODEL["models"]["baseline"]["test"]["pr_auc"]
+    # La marca numérica pegada al umbral validado pierde su texto para no superponerse.
+    marks = {i / 20: (f"{i / 20:.2f}".replace(".", ",") if i % 2 == 0 and abs(i / 20 - chosen) >= 0.03 else "")
+             for i in range(1, 17)}
+    marks[chosen] = {"label": "Validado", "style": {"color": RIO, "fontWeight": 600}}
     return html.Div([
         html.Div([
             html.H2("Un modelo para ordenar perfiles, con límites claros"),
             html.P("Comparamos cuatro enfoques. El mejor entre los probados fue boosting de histogramas. Sus resultados corresponden a viviendas reservadas del mismo censo de 2018."),
         ], className="page-intro"),
         html.Div([
-            card("Average Precision", f"{SOURCE['pr_auc']:.3f}".replace(".", ","), "Referencia por prevalencia: 0,211 · prueba interna"),
+            card("Average Precision", f"{SOURCE['pr_auc']:.3f}".replace(".", ","),
+                 "Referencia por prevalencia: " + f"{baseline_ap:.3f}".replace(".", ",") + " · prueba interna"),
             card("ROC-AUC", f"{SOURCE['roc_auc']:.3f}".replace(".", ","), "Capacidad de ordenar casos · prueba interna", "navy"),
             card("Brier", f"{SOURCE['brier']:.3f}".replace(".", ","), "Menor es mejor · prueba interna", "coral"),
         ], className="kpi-grid model-metrics"),
         html.Section([
             html.Div([
-                html.H3("El modelo se mantiene después de nuevas pruebas"),
-                html.P(f"Probamos {audit['alternatives']} alternativas de preparación de datos y ajuste. La mayor AP nueva en validación fue " +
-                       f"{audit['best_new_validation_ap']:.4f}".replace(".", ",") +
-                       ", frente a " + f"{audit['original_validation_ap']:.4f}".replace(".", ",") +
-                       " del modelo original. La diferencia fue demasiado pequeña e incierta para justificar un cambio."),
+                html.H3("Qué cambió en esta versión"),
+                html.P(f"Las {audit['alternatives']} alternativas de preparación de datos y ajuste probadas antes no mejoraron el modelo de 26 variables. "
+                       "La mejora llegó con dos variables de contexto: cuántas personas más del hogar declararon un problema de salud y qué proporción lo declaró en la sección censal. "
+                       f"El AP de validación pasó de {ap_text(change['previous_validation_ap'])} a {ap_text(change['new_validation_ap'])}, y en secciones no vistas al ajustar, "
+                       f"de {ap_text(change['previous_unseen_sections_ap'])} a {ap_text(change['new_unseen_sections_ap'])}."),
+                html.P("No revelan la acción de la persona, pero se miden en el mismo censo. Pueden reflejar problemas más leves o la forma de responder; no indican una causa."),
             ]),
             html.Div([
                 html.Strong("Una diferencia que merece atención"),
-                html.P(f"Con el umbral elegido, la sensibilidad fue {fmt_pct(audit['recall_difficulty'])} entre quienes declararon dificultad funcional y {fmt_pct(audit['recall_no_difficulty'])} entre quienes no la declararon. Al ajustar descriptivamente por edad, la brecha se reduce, pero persiste."),
-                html.A("Ver la revisión completa en el Bookdown", href="/informe/modelo.html#revision-modelo-2026", target="_blank", rel="noopener noreferrer"),
+                html.P(f"Con el umbral elegido, la sensibilidad fue {fmt_pct(equity['recall_difficulty'])} entre quienes declararon dificultad funcional y {fmt_pct(equity['recall_no_difficulty'])} entre quienes no la declararon. "
+                       f"Al ajustar descriptivamente por edad, las cifras son {fmt_pct(equity['age_adjusted_recall_difficulty'])} y {fmt_pct(equity['age_adjusted_recall_no_difficulty'])}. "
+                       f"Entre personas de 60 años o más fue {fmt_pct(equity['recall_60_plus'])}."),
+                html.A("Ver la revisión completa en el Bookdown", href="/informe/modelo.html#modelo-contexto-2026", target="_blank", rel="noopener noreferrer"),
             ]),
         ], className="audit-strip"),
         html.Div([
             panel("Comparación en prueba", graph(figure=comparison_figure()), "MÉTRICA PRINCIPAL",
                   "Average Precision resume el ordenamiento de la clase minoritaria. Es AP no interpolada; no es el área trapezoidal de la curva PR."),
-            panel("Curvas de discriminación", graph(figure=curve_figure()), "ROC Y PRECISIÓN–RECALL",
+            panel("Curvas de discriminación", graph(figure=curve_figure()), "ROC Y PRECISIÓN–SENSIBILIDAD",
                   "Curvas visuales resumidas; las cifras de AP y ROC-AUC provienen de todas las puntuaciones de prueba."),
         ], className="two-col"),
         html.Div([
@@ -526,18 +603,20 @@ def layout_modelo() -> html.Div:
             panel("Aciertos y errores", graph("confusion-chart"), "MATRIZ DE CONFUSIÓN",
                   "La clase positiva es la acción principal fuera de la ruta formal. Las cifras son del conjunto de prueba reservado."),
         ], className="two-col"),
+        panel("¿Y si solo se revisara una parte?", prioritization_table(), "PRIORIZACIÓN EXPLORATORIA",
+              f"Ordena las {fmt_int(MODEL['metadata']['test_n'])} personas de la prueba de 2018 por puntuación. No es una recomendación: no hay costos ni capacidad definidos, y el modelo no debe usarse para decidir sobre personas."),
         html.Div([
             panel("Probabilidad y frecuencia observada", graph(figure=calibration_figure()), "CALIBRACIÓN",
                   "Cada punto agrupa aproximadamente una décima parte de la prueba. La cercanía a la diagonal no valida el modelo para otro año."),
             panel("Variables que más contribuyeron al ordenamiento", graph(figure=importance_figure()), "IMPORTANCIA POR PERMUTACIÓN",
-                  "La caída de AP al alterar una variable mide dependencia predictiva. No representa efecto causal ni justifica una decisión individual."),
+                  "En azul, las dos variables añadidas. La caída de AP mide dependencia predictiva; no representa efecto causal ni justifica una decisión individual."),
         ], className="two-col"),
         html.Div([
             html.H3("Cómo leer este modelo"),
             html.Div([
                 html.Div([html.H4("Separación cuidadosa"), html.P("Entrenamiento, validación y prueba se separaron por vivienda. Preprocesamiento y ajustes se hicieron dentro de entrenamiento; el umbral se eligió en validación.")]),
                 html.Div([html.H4("Una mejora acotada"), html.P(
-                    "El AP del modelo fue 0,339; su intervalo interno de 95 % fue "
+                    "El AP del modelo fue " + f"{SOURCE['pr_auc']:.3f}".replace(".", ",") + "; su intervalo interno de 95 % fue "
                     f"{uncertainty['selected_ap'][0]:.3f}".replace(".", ",") + "–" +
                     f"{uncertainty['selected_ap'][1]:.3f}".replace(".", ",") +
                     ". La discriminación es moderada.")]),
@@ -588,7 +667,8 @@ app.layout = html.Div([
     ]),
     html.Footer([
         html.Span("DATAVIZ · Análisis reproducible del Atlántico"),
-        html.Span([html.A("Microdatos CNPV 2018 · DANE", href="https://microdatos.dane.gov.co/catalog/643",
+        html.Span([html.A("Aplicación Shiny", href="https://shiny-salud-atlantico-409319239507.us-east1.run.app/", target="_blank", rel="noopener noreferrer"), " · ",
+                   html.A("Microdatos CNPV 2018 · DANE", href="https://microdatos.dane.gov.co/catalog/643",
                           target="_blank", rel="noopener noreferrer"), " · Cifras históricas"]),
     ], className="site-footer"),
 ], className="app-shell")
@@ -618,10 +698,14 @@ def update_explore(municipios, sexo, edad, zona, dificultad, metric):
     positive = sum(r["sin_formal"] for r in rows)
     coverage_pct = coverage_for(municipios, sexo, edad, zona, dificultad)
     trusted_rate = safe_to_rate(n, coverage_pct)
+    reference = None if trusted_rate else reference_aggregate(municipios, sexo, edad, zona, dificultad)
+    hidden_note = ("Se oculta en los cruces filtrables; ver la referencia de abajo" if reference
+                   else "Se oculta para evitar una lectura engañosa")
     kpis = [
-        card("Personas representadas", "≈ " + fmt_int(n), "Suma de celdas publicables redondeadas"),
+        card("Personas representadas", "≈ " + fmt_int(n) if rows else "Sin cruces publicables",
+             "Suma de celdas publicables redondeadas" if rows else "Ninguna celda de esta selección cumple las reglas de publicación"),
         card("Acción principal fuera de ruta formal", fmt_pct(positive / n) if trusted_rate else "Cobertura insuficiente",
-             "Proporción aproximada en celdas publicables" if trusted_rate else "Se oculta para evitar una lectura engañosa", "coral"),
+             "Proporción aproximada en celdas publicables" if trusted_rate else hidden_note, "coral"),
     ]
     coverage_text = "sin estimación publicable" if coverage_pct is None else f"al menos {coverage_pct} %"
     interpretation = (
@@ -629,7 +713,24 @@ def update_explore(municipios, sexo, edad, zona, dificultad, metric):
         if trusted_rate else
         "La tasa se oculta porque esta selección no tiene cobertura o tamaño suficientes para interpretarla."
     )
-    coverage = f"{len(rows)} cruces publicables en esta selección. Cobertura del filtro: {coverage_text}" + (" (límite conservador por municipio)." if municipios and len(municipios) > 1 else ".") + f" {RULE_NOTE} {interpretation}"
+    state = "sin-datos" if not rows else ("visible" if trusted_rate else "oculta")
+    state_label = {"visible": "\u2713 Tasa visible", "oculta": "\u2298 Tasa oculta", "sin-datos": "\u2298 Sin cruces publicables"}[state]
+    coverage_label = f"Cobertura: {coverage_text}" + (" (límite conservador por municipio)" if municipios and len(municipios) > 1 else "")
+    coverage = [html.Div([
+        html.Div([html.Strong(state_label), html.Span(f"{len(rows)} cruces publicables en esta selección. {interpretation}")], className="cinta-texto"),
+        html.Div([
+            html.Div(coverage_label, className="cinta-rotulo"),
+            html.Div([html.Div(className="cinta-relleno", style={"width": f"{coverage_pct or 0}%"}),
+                      html.Div(className="cinta-umbral", title="Umbral de 80 %")],
+                     className="cinta-pista", role="img", **{"aria-label": f"{coverage_label}; umbral de publicación 80 %"}),
+        ], className="cinta-medida"),
+    ], className=f"cinta {state}")]
+    if reference:
+        label, ref, source = reference
+        coverage.append(html.Span(
+            f"Referencia sin cruces adicionales: «{label}» registra ≈ {fmt_pct(ref['sin_formal'] / ref['n'])} sobre una base aproximada de "
+            f"{fmt_int(ref['n'])} personas en {source}. Ese agregado se publica aparte, con conteos redondeados a 10, y no procede de las celdas filtrables.",
+            className="coverage-reference"))
     ranked = ranked_figure(rows, metric, sexo, edad, zona, dificultad)
     ranked_style = {"height": f"{int(ranked.layout.height)}px", "width": "100%"}
     composition, composition_note = composition_figure(rows, municipios, sexo, edad, zona, dificultad)
