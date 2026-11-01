@@ -8,5 +8,6 @@ __pycache__/
 *.zip
 generar_datos.py
 generar_relato.py
+generar_contenido.py
 pruebas.py
 .venv/

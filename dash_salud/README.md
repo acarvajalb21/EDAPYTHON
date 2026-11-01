@@ -1,8 +1,7 @@
-# Panel interactivo DATAVIZ · Salud Atlántico
+# Panel interactivo Salud Atlántico
 
-Panel Dash de tres vistas: **Proyecto**, con contexto, pregunta, objetivos y
-cohorte; **EDA**, con filtros y cruces censales; y **Modelo y método**, con
-evaluación del clasificador. El universo es la población del Atlántico que reportó un problema
+Panel Dash de nueve secciones: **Introducción**, **Objetivos**, **Problema**, **Marco teórico**, **EDA univariado**, **EDA multivariado**, **Modelado**, **Modelo** y **Conclusiones**.
+El universo es la población del Atlántico que reportó un problema
 de salud en los 30 días previos al CNPV 2018 sin hospitalización y con acción
 principal clasificable. La clase «fuera de la ruta formal» significa que la
 acción principal **no** fue EPS con atención o médico particular bajo la regla
@@ -14,7 +13,8 @@ una barrera causal.
 Los CSV originales del DANE se leen localmente con
 `python -m dash_salud.generar_datos --data-dir RUTA_A_LOS_CSV`, desde la raíz de
 `EDAPYTHON`. El generador valida sus SHA-256 frente al informe de entrenamiento,
-reproduce la prueba reservada y escribe dos JSON:
+reproduce la prueba reservada y escribe dos JSON. Los textos y tablas de las
+secciones están en un tercero:
 
 - `data/eda.json`: cubo real de municipio × sexo × edad amplia × zona ×
   dificultad funcional. Solo se publican celdas con al menos 30 personas y
@@ -26,6 +26,11 @@ reproduce la prueba reservada y escribe dos JSON:
   importancias y matrices para umbrales del conjunto de prueba. No contiene
   registros ni puntuaciones individuales. Se omiten métricas de subgrupos
   pequeños.
+- `data/contenido.json`: textos de las secciones y tablas agregadas del Bookdown,
+  común con Shiny. Se genera con `python -m dash_salud.generar_contenido --tablas
+  ../EDAR-main/data --destino dash_salud/data ../EDAR-main/shiny_salud/data`. Sus
+  grupos usan la regla del panorama municipal. El nombre del proyecto se cambia
+  en la constante `NOMBRE` de ese generador.
 
 La cobertura de la exploración puede cambiar según los filtros. Cuando cae
 por debajo de 80 % o la base publicada es menor de 200, el panel oculta la
@@ -50,11 +55,11 @@ Abra `http://localhost:8050`. Para regenerar los agregados, instale también
 `python -m dash_salud.generar_datos --data-dir RUTA_CSV_DANE`. El generador usa el entorno de entrenamiento
 de `ml_salud` (pandas, scikit-learn y joblib compatibles con el modelo).
 La aplicación publicada requiere únicamente Dash, Plotly y Gunicorn.
-La interfaz y las gráficas usan IBM Plex Sans. El archivo variable latino se
-sirve desde `assets/fonts/`; su licencia OFL está en ese mismo directorio.
+La interfaz y las gráficas usan Plus Jakarta Sans y los titulares, Bricolage
+Grotesque. Los archivos se sirven desde `assets/fonts/`, con sus licencias OFL.
 
 El Bookdown renderizado se copia a `dash_salud/informe/` con `index.html` y
-sus recursos. El enlace «Leer informe completo» abre `/informe/`.
+sus recursos. El enlace «Informe completo» del pie abre `/informe/`.
 
 ## Publicar en Google Cloud Run
 
@@ -76,7 +81,7 @@ Build/Artifact Registry y facturación habilitada en el proyecto:
 El script verifica los dos JSON y el Bookdown, usa `gcloud run deploy
 --source .` y publica un enlace accesible sin autenticación. El servicio está
 disponible en [Google Cloud Run](https://dataviz-salud-atlantico-409319239507.us-east1.run.app/).
-Tras actualizarlo, compruebe `/health`, `/informe/` y los tres paneles. Cloud
+Tras actualizarlo, compruebe `/health`, `/informe/` y las nueve secciones. Cloud
 Run reserva algunas rutas terminadas en `z`, por lo que se usa `/health`.
 
 Si se usa **Cloud Shell**, clone este repositorio y ejecute:

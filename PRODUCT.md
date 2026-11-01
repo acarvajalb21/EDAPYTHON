@@ -21,7 +21,7 @@ El análisis aplica una regla operativa explícita a respuestas censales de una 
 ## Operating Context
 
 - El tablero público está en Google Cloud Run y se usa en un navegador, sin inicio de sesión. Su contenido está en español.
-- Las vistas del tablero son **Proyecto**, **EDA** y **Modelo y método**. El informe Bookdown amplía definiciones, calidad de datos, resultados y reproducibilidad.
+- Las secciones del tablero son **Introducción**, **Objetivos**, **Problema**, **Marco teórico**, **EDA univariado**, **EDA multivariado**, **Modelado**, **Modelo** y **Conclusiones**. El informe Bookdown amplía definiciones, calidad de datos, resultados y reproducibilidad.
 - El EDA permite combinar filtros por municipio, sexo reportado, grupo de edad, zona y dificultad funcional. También presenta comparaciones descriptivas y una exploración ilustrativa del umbral del modelo.
 - Los CSV individuales del DANE se procesan localmente. La web sirve agregados publicables y no expone registros individuales ni predicciones personales.
 
@@ -35,7 +35,7 @@ El análisis aplica una regla operativa explícita a respuestas censales de una 
 
 ## Brand Commitments
 
-- Nombre usado en la interfaz: **DATAVIZ · Salud Atlántico**.
+- Nombre provisional en la interfaz: **Salud Atlántico**. El equipo definirá el nombre definitivo.
 - El lenguaje público debe explicar las etiquetas, los denominadores, la cobertura y la incertidumbre sin convertir asociaciones en causas ni resultados del modelo en recomendaciones individuales.
 
 ## Evidence on Hand

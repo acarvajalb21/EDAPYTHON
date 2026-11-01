@@ -20,19 +20,23 @@ MODEL = json.loads((DATA_DIR / "modelo.json").read_text(encoding="utf-8"))
 SOURCE = MODEL["models"]["hist_gradient_boosting"]["test"]
 EXACT = {"n": EDA["metadata"]["total_labeled_exact"], "sin_formal": EDA["metadata"]["no_access_exact"]}
 COVERAGE = {tuple(row["key"]): row["coverage_floor_5pct"] for row in EDA.get("coverage_index", [])}
+# Textos y tablas de las secciones, comunes con Shiny; ver generar_contenido.py.
+CONTENIDO = json.loads((DATA_DIR / "contenido.json").read_text(encoding="utf-8"))
+NOMBRE = CONTENIDO["nombre"]
+SECCIONES = [seccion["id"] for seccion in CONTENIDO["secciones"]]
 
-# Tokens del sistema «Papel censal». Arcilla significa siempre «fuera de la ruta formal».
-TINTA = "#13232C"
-TINTA_MEDIA = "#465660"
-TINTA_SUAVE = "#5F6D75"
-HILO = "#DDD8CB"
-HOJA = "#FDFCF9"
-RIO = "#00739A"
-ARCILLA = "#C4552D"
-ANIL = "#3F5AA6"
-OCRE = "#B57A08"
-REFERENCIA = "#9A978C"
-BASE = "#C9C4B6"
+# Tokens de color. FUERA significa siempre «fuera de la ruta formal» y DENTRO, «dentro».
+TINTA = "#141C33"
+TINTA_MEDIA = "#434C66"
+TINTA_SUAVE = "#5D6680"
+HILO = "#DFE3EE"
+HOJA = "#FFFFFF"
+DENTRO = "#2454D6"
+FUERA = "#E8505B"
+GRUPO_A = "#008F88"
+GRUPO_B = "#BC7A00"
+REFERENCIA = "#9097A8"
+BASE = "#C3C9D8"
 AGE_ORDER = EDA["metadata"]["age_bands"]
 RULE_NOTE = "Cruces publicables del censo de 2018; recuentos redondeados a 5. Se omiten celdas pequeñas. Las gráficas basadas en esos cruces ocultan tasas con menos de 80 % de cobertura o base aproximada menor de 200."
 MODEL_NAMES = {
@@ -52,18 +56,6 @@ FEATURE_NAMES = {
     "SECCION_PCT_ENFERMOS": "Enfermos en la sección censal",
 }
 NUEVAS = {"HOGAR_OTROS_ENFERMOS", "SECCION_PCT_ENFERMOS"}
-PREGUNTAS = (
-    ("¿El 21,06 % significa que se negó la atención?",
-     "No. Es una clasificación de la acción principal declarada. Solo 1.907 de esas 28.650 personas acudieron a su EPS y no recibieron atención; las demás declararon otra acción o ninguna."),
-    ("¿Describe el Atlántico de hoy?",
-     "No. Son respuestas del censo de 2018 de quienes declararon un problema de salud reciente. No se extrapolan a otros años ni a toda la población."),
-    ("¿Por qué algunas tasas se ocultan?",
-     "Para proteger grupos pequeños y evitar lecturas engañosas. Una tasa se oculta si su base aproximada es menor de 200 personas o si la cobertura del filtro es menor de 80 %."),
-    ("¿Por qué las cifras filtradas no coinciden con el informe?",
-     "Las celdas pequeñas se suprimen y los recuentos se redondean. Por eso las cifras de las aplicaciones son aproximadas; las exactas están en el informe."),
-    ("¿El modelo dice qué hará una persona?",
-     "No. Ordena perfiles dentro del mismo censo, con discriminación moderada, y no debe usarse para decidir sobre personas. Este tablero no calcula predicciones individuales."),
-)
 # Los 23 municipios DIVIPOLA del Atlántico; mismos nombres que generar_datos.MUNICIPIOS.
 ATLANTICO_MUNICIPIOS = (
     "Barranquilla", "Baranoa", "Campo de la Cruz", "Candelaria", "Galapa", "Juan de Acosta",
@@ -99,9 +91,9 @@ def omitted_municipios_sentence(present, place: str, reason: str) -> str:
 def figure_base(fig: go.Figure, height: int = 370, margin: dict | None = None) -> go.Figure:
     fig.update_layout(
         height=height, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", separators=",.",
-        font=dict(family="IBM Plex Sans, Segoe UI, Arial, sans-serif", color=TINTA_MEDIA, size=13),
+        font=dict(family="Plus Jakarta Sans, Segoe UI, Arial, sans-serif", color=TINTA_MEDIA, size=13),
         margin=margin or dict(l=32, r=25, t=30, b=42),
-        hoverlabel=dict(bgcolor=TINTA, font_color="white", font_family="IBM Plex Sans, Segoe UI, Arial, sans-serif"),
+        hoverlabel=dict(bgcolor=TINTA, font_color="white", font_family="Plus Jakarta Sans, Segoe UI, Arial, sans-serif"),
         xaxis=dict(gridcolor=HILO, zeroline=False),
         yaxis=dict(gridcolor=HILO, zeroline=False),
         legend=dict(orientation="h", y=-0.22),
@@ -146,10 +138,10 @@ def graph(id_: str | None = None, figure: go.Figure | None = None) -> dcc.Graph:
 def action_breakdown() -> html.Div:
     labels = EDA["metadata"]["label_breakdown_exact"]
     routes = [
-        ("EPS y recibió atención", labels["eps_atendido"], "route-rio"),
-        ("Otra acción principal o ninguna", labels["otras_acciones_o_ninguna"], "route-arcilla"),
-        ("Médico particular", labels["medico_particular"], "route-rio"),
-        ("EPS sin atención", labels["eps_no_atendido"], "route-arcilla"),
+        ("EPS y recibió atención", labels["eps_atendido"], "route-dentro"),
+        ("Otra acción principal o ninguna", labels["otras_acciones_o_ninguna"], "route-fuera"),
+        ("Médico particular", labels["medico_particular"], "route-dentro"),
+        ("EPS sin atención", labels["eps_no_atendido"], "route-fuera"),
     ]
     return html.Div([
         html.P(f"De {fmt_int(EXACT['n'])} personas con respuesta clasificable", className="route-denominator"),
@@ -165,19 +157,6 @@ def action_breakdown() -> html.Div:
                      className="route-track", **{"aria-hidden": "true"}),
         ], className="route-row") for name, value, tone in routes],
     ], className="route-breakdown")
-
-
-def municipal_overview_figure() -> go.Figure:
-    records = sorted(EDA["municipal_overview"], key=lambda row: row["sin_formal"] / row["n"])
-    fig = go.Figure(go.Bar(
-        x=[100 * r["sin_formal"] / r["n"] for r in records],
-        y=[r["municipio"] for r in records], orientation="h",
-        marker=dict(color=ARCILLA),
-        customdata=[[r["n"], r["sin_formal"]] for r in records],
-        hovertemplate="%{y}<br>%{x:.1f} % con acción principal fuera de ruta formal<br>Base aproximada: %{customdata[0]:,}<extra></extra>",
-    ))
-    fig.update_layout(xaxis_title="Porcentaje aproximado (%)", yaxis_title="")
-    return figure_base(fig, height=610, margin=dict(l=138, r=25, t=15, b=42))
 
 
 def filter_cube(municipios, sexo, edad, zona, dificultad) -> list[dict]:
@@ -219,7 +198,7 @@ def reference_aggregate(municipios, sexo, edad, zona, dificultad) -> tuple[str, 
         return None
     if municipios and len(municipios) == 1 and sexo == "Todos" and zona == "Todos":
         row = next((r for r in EDA["municipal_overview"] if r["municipio"] == municipios[0]), None)
-        return (municipios[0], row, "el panorama municipal de la vista Proyecto") if row else None
+        return (municipios[0], row, "el panorama municipal de esta aplicación") if row else None
     if not municipios:
         rows = [r for r in EDA["zone_sex_summary"]
                 if (sexo == "Todos" or r["sexo"] == sexo) and (zona == "Todos" or r["zona"] == zona)]
@@ -257,7 +236,7 @@ def ranked_figure(rows: list[dict], metric: str, sexo, edad, zona, dificultad) -
         xlabel = "Porcentaje aproximado (%)"
         hover = "%{y}<br>%{x:.1f} % aprox.<br>Base: %{customdata[0]:,}<extra></extra>"
     fig = go.Figure(go.Bar(x=x, y=[r["municipio"] for r in data], orientation="h",
-                           marker_color=ARCILLA, customdata=[[r["n"]] for r in data],
+                           marker_color=FUERA, customdata=[[r["n"]] for r in data],
                            hovertemplate=hover))
     fig.update_layout(xaxis_title=xlabel, yaxis_title="")
     return figure_base(fig, height=max(170, 67 + 24 * len(data)), margin=dict(l=130, r=22, t=20, b=47))
@@ -271,7 +250,7 @@ def age_figure(rows: list[dict], municipios, sexo, zona, dificultad) -> go.Figur
     if not data:
         return empty_figure("Cobertura o tamaño insuficiente para comparar edades")
     fig = go.Figure()
-    for label, color in [("Sin dificultad funcional", ANIL), ("Con dificultad funcional", OCRE)]:
+    for label, color in [("Sin dificultad funcional", GRUPO_A), ("Con dificultad funcional", GRUPO_B)]:
         group = {r["edad"]: r for r in data if r["dificultad"] == label}
         keys = [age for age in AGE_ORDER if age in group]
         if keys:
@@ -307,7 +286,7 @@ def composition_figure(rows: list[dict], municipios, sexo, edad, zona, dificulta
     fig = go.Figure()
     zones = [z for z in ["Cabecera", "Centros poblados y rural disperso"]
              if any(r["zona"] == z for r in data)]
-    for label, color in [("Mujer", OCRE), ("Hombre", ANIL)]:
+    for label, color in [("Mujer", GRUPO_B), ("Hombre", GRUPO_A)]:
         group = {r["zona"]: r for r in data if r["sexo"] == label}
         present = [z for z in zones if z in group]
         if not present:
@@ -331,7 +310,7 @@ def comparison_figure() -> go.Figure:
     fig = go.Figure(go.Bar(
         x=[MODEL_NAMES[k] for k in keys],
         y=[MODEL["models"][k]["test"]["pr_auc"] for k in keys],
-        marker_color=[REFERENCIA, BASE, BASE, RIO],
+        marker_color=[REFERENCIA, BASE, BASE, DENTRO],
         text=[f"{MODEL['models'][k]['test']['pr_auc']:.3f}".replace(".", ",") for k in keys],
         textposition="outside", hovertemplate="%{x}<br>Average Precision: %{y:.3f}<extra></extra>",
     ))
@@ -344,10 +323,10 @@ def curve_figure() -> go.Figure:
     roc = MODEL["roc_curve"]
     pr = MODEL["pr_curve"]
     fig.add_scatter(x=[r["x"] for r in roc], y=[r["y"] for r in roc], mode="lines",
-                    name="ROC", line=dict(color=RIO, width=2.5), visible=True)
+                    name="ROC", line=dict(color=DENTRO, width=2.5), visible=True)
     fig.add_scatter(x=[0, 1], y=[0, 1], mode="lines", name="Azar", line=dict(color=REFERENCIA, width=1.5), visible=True)
     fig.add_scatter(x=[r["x"] for r in pr], y=[r["y"] for r in pr], mode="lines",
-                    name="Precisión–sensibilidad", line=dict(color=RIO, width=2.5), visible=False)
+                    name="Precisión–sensibilidad", line=dict(color=DENTRO, width=2.5), visible=False)
     base = MODEL["metadata"]["test_positive"] / MODEL["metadata"]["test_n"]
     fig.add_scatter(x=[0, 1], y=[base, base], mode="lines", name="Prevalencia",
                     line=dict(color=REFERENCIA, width=1.5), visible=False)
@@ -366,7 +345,7 @@ def calibration_figure() -> go.Figure:
     fig.add_scatter(x=[0, 0.6], y=[0, 0.6], name="Calibración perfecta", mode="lines",
                     line=dict(color=REFERENCIA, width=1.5))
     fig.add_scatter(x=[r["mean_predicted"] for r in bins], y=[r["observed"] for r in bins],
-                    mode="lines+markers", name="Modelo", line=dict(color=RIO, width=2.5),
+                    mode="lines+markers", name="Modelo", line=dict(color=DENTRO, width=2.5),
                     marker=dict(size=9, line=dict(color=HOJA, width=2)), customdata=[[r["n"]] for r in bins],
                     hovertemplate="Predicho: %{x:.1%}<br>Observado: %{y:.1%}<br>Base: %{customdata[0]:,}<extra></extra>")
     fig.update_layout(xaxis_title="Probabilidad predicha media", yaxis_title="Proporción observada",
@@ -378,7 +357,7 @@ def importance_figure() -> go.Figure:
     data = sorted(MODEL["importance"][:8], key=lambda x: x["mean_ap_drop"])
     fig = go.Figure(go.Bar(x=[r["mean_ap_drop"] for r in data],
                            y=[FEATURE_NAMES.get(r["feature"], r["feature"]) for r in data],
-                           orientation="h", marker_color=[RIO if r["feature"] in NUEVAS else BASE for r in data],
+                           orientation="h", marker_color=[DENTRO if r["feature"] in NUEVAS else BASE for r in data],
                            hovertemplate="%{y}<br>Caída de AP al permutar: %{x:.3f}<extra></extra>"))
     fig.update_layout(xaxis_title="Caída media de AP", yaxis_title="")
     return figure_base(fig, height=355, margin=dict(l=170, r=25, t=15, b=45))
@@ -416,79 +395,119 @@ def confusion_figure(row: dict) -> go.Figure:
     fig = go.Figure(go.Heatmap(z=z, x=["Ruta formal", "Fuera de ruta formal"],
                                y=["Ruta formal", "Fuera de ruta formal"],
                                text=[[fmt_int(v) for v in line] for line in z], texttemplate="%{text}",
-                               textfont=dict(size=18), colorscale=[[0, "#EFF4F4"], [1, "#6FAFC4"]], showscale=False,
+                               textfont=dict(size=18), colorscale=[[0, "#EEF2FC"], [1, "#7E9FEE"]], showscale=False,
                                hovertemplate="Real: %{y}<br>Predicho: %{x}<br>%{text} personas<extra></extra>"))
     fig.update_layout(xaxis_title="Predicción", yaxis_title="Dato censal")
     fig.update_yaxes(autorange="reversed")
     return figure_base(fig, height=350, margin=dict(l=138, r=25, t=22, b=70))
 
 
-def layout_panorama() -> html.Div:
-    source = EDA["metadata"]
-    labels = source["label_breakdown_exact"]
-    flow = source["population_flow"]
-    return html.Div([html.Div(id="relato"), html.Div([
-        html.Section([
-            html.H2("Una respuesta del censo no cuenta toda la historia"),
-            html.P("Ante un problema de salud, una persona pudo acudir a su entidad de seguridad social, consultar a un médico particular, buscar otra alternativa o no hacer nada. El CNPV registra cuál fue su tratamiento principal. Comparar esas respuestas ayuda a detectar patrones que merecen estudiarse mejor; no permite reconstruir toda la trayectoria de atención."),
-            html.Div([
-                html.Div([html.Span("FUENTE", className="context-label"), html.Strong("CNPV 2018 · DANE"),
-                          html.P("Microdatos anonimizados de personas, hogares y viviendas del Atlántico.")]),
-                html.Div([html.Span("UNIDAD", className="context-label"), html.Strong("Una persona"),
-                          html.P("Que declaró un problema de salud en los 30 días previos, sin hospitalización.")]),
-                html.Div([html.Span("ALCANCE", className="context-label"), html.Strong("Descripción de 2018"),
-                          html.P("Las asociaciones no indican causas ni describen necesariamente la situación actual.")]),
-            ], className="context-facts"),
-        ], className="story-section"),
-        html.Section([
-            html.Div([
-                html.H2("Entender cómo varía la ruta declarada de atención"),
-                html.P("Analizar las diferencias en la clasificación de acceso formal según características funcionales, sociodemográficas, territoriales, del hogar y de la vivienda. Después, evaluar hasta qué punto esas variables permiten ordenar la clase menos frecuente sin usar información que revele la respuesta."),
-            ], className="objective-lead"),
-            html.Div([
-                html.H3("Tres objetivos concretos"),
-                html.Ol([
-                    html.Li([html.Strong("Definir bien la población y la respuesta."), " Mostrar quiénes entran al análisis, cómo se construye la etiqueta y qué queda fuera."]),
-                    html.Li([html.Strong("Explorar las diferencias."), " Comparar edad, sexo, dificultad funcional, zona y municipio con filtros y denominadores visibles."]),
-                    html.Li([html.Strong("Evaluar el modelo con prudencia."), " Contrastar enfoques, revisar errores y reconocer dónde la predicción es menos fiable."]),
-                ]),
-            ], className="objective-list"),
-        ], className="objective-grid"),
-        html.Section([
-            html.Div([
-                html.H2("¿A quién representan estas cifras?"),
-                html.P("La cohorte no es toda la población del Atlántico. Solo incluye respuestas para las que pudo aplicarse la regla del proyecto."),
-            ], className="section-heading"),
-            html.Div([
-                html.Div([html.Span("01", className="flow-step"), html.Strong(fmt_int(flow["people"])),
-                          html.Span("personas en el archivo censal", className="flow-note")]),
-                html.Div([html.Span("02", className="flow-step"), html.Strong(fmt_int(flow["recent_health_problem"])),
-                          html.Span("declararon el problema de salud definido", className="flow-note")]),
-                html.Div([html.Span("03", className="flow-step"), html.Strong(fmt_int(flow["analytic"])),
-                          html.Span(f"con etiqueta clasificable; {fmt_int(flow['unclassifiable'])} excluidas", className="flow-note")]),
-            ], className="flow-grid"),
-            html.P("La unidad es la persona. Hogar y vivienda aportan características adicionales; las uniones conservan una fila por persona. No se extrapolan estos resultados a otros años.", className="flow-caption"),
-        ], className="story-section"),
-        html.Div([
-            panel("Las cuatro rutas registradas", action_breakdown(), "CÓMO SE DEFINIÓ LA RESPUESTA",
-                  "Son acciones principales reportadas. ‘Otra acción o ninguna’ incluye farmacia y otras formas de atención; no equivale a ausencia de toda atención."),
-            html.Div([
-                html.H3("La mayoría de la clase ‘fuera de la ruta formal’ no reportó una negativa de la EPS."),
-                html.P(f"De {fmt_int(EXACT['sin_formal'])} personas en esa clase, {fmt_int(labels['eps_no_atendido'])} dijeron haber acudido a su EPS sin recibir atención. Las otras {fmt_int(labels['otras_acciones_o_ninguna'])} registraron una acción principal distinta o ninguna. Por eso, el panel evita llamar a toda esa clase ‘atención denegada’."),
-                html.Div("Definición operativa · no permite afirmar causas.", className="insight-foot"),
-            ], className="insight-card"),
-        ], className="two-col uneven"),
-        panel("Una vista por municipio", graph(figure=municipal_overview_figure()), "PATRÓN TERRITORIAL",
-              "Se muestran municipios con al menos 100 personas y 10 en cada clase; conteos redondeados a 10 antes de publicarse."
-              + omitted_municipios_sentence([r["municipio"] for r in EDA["municipal_overview"]], "en esta vista", "no alcanza ese mínimo")
-              + " Las diferencias pueden reflejar composición demográfica y otras características."),
-        html.Section([
-            html.H2(["Lo que conviene ", html.Em("preguntar")]),
-            *[html.Details([html.Summary(pregunta), html.P(respuesta)], className="pregunta") for pregunta, respuesta in PREGUNTAS],
-        ], className="preguntas"),
-        html.P("Para consultar las definiciones, las tablas exactas y las decisiones metodológicas, abre el informe Bookdown desde el enlace superior.", className="source-line"),
-        html.P(f"Fuente: microdatos anonimizados del CNPV 2018, DANE. Universo: quienes reportaron problema de salud en los últimos 30 días sin hospitalización. Se excluyeron {fmt_int(flow['unclassifiable'])} respuestas no clasificables. Nombres municipales: DIVIPOLA del DANE. Los cuadros del relato representan grupos, no personas reales.", className="source-line"),
-    ], className="page")])
+def acento(texto: str) -> list:
+    """Convierte «a *b* c» en un texto con la palabra de acento marcada."""
+    return [html.Em(parte) if i % 2 else parte for i, parte in enumerate(texto.split("*")) if parte]
+
+
+def barras_figure(b: dict) -> go.Figure:
+    valores = b["valores"][::-1]
+    bases = b.get("bases", [None] * len(valores))[::-1]
+    textos = [fmt_pct(v / 100) if b["unidad"] == "%" else fmt_int(v) for v in valores]
+    detalle = [texto if base is None else f"{texto} · base aproximada {fmt_int(base)}" for texto, base in zip(textos, bases)]
+    fig = go.Figure(go.Bar(x=valores, y=b["categorias"][::-1], orientation="h", text=textos, textposition="outside", cliponaxis=False,
+                           marker_color={"fuera": FUERA, "dentro": DENTRO}.get(b["color"], TINTA_SUAVE),
+                           customdata=detalle, hovertemplate="%{y}<br>%{customdata}<extra></extra>"))
+    fig.update_xaxes(visible=False, range=[0, max(valores) * 1.2])
+    fig.update_yaxes(automargin=True, ticksuffix="  ")
+    fig = figure_base(fig, height=max(170, 58 + 25 * len(valores)), margin=dict(l=8, r=18, t=6, b=6))
+    return fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
+
+
+def caja(contenido: list, titulo: str | None = None, meta: str | None = None, nota: str | None = None) -> html.Div:
+    return html.Div([
+        html.H3(titulo) if titulo else None,
+        html.Span(meta, className="c-meta") if meta else None,
+        *contenido,
+        html.P(nota, className="c-nota") if nota else None,
+    ], className="c-bloque")
+
+
+def enlace(texto: str, url: str, clase: str | None = None) -> html.A:
+    return html.A(texto, href=url, target="_blank", rel="noopener noreferrer", className=clase)
+
+
+def tabla(b: dict) -> html.Div:
+    clase = lambda j: "izq" if j < b["texto_cols"] else None
+    return html.Div(html.Table([
+        html.Thead(html.Tr([html.Th(texto, scope="col", className=clase(j)) for j, texto in enumerate(b["columnas"])])),
+        html.Tbody([html.Tr([html.Td(valor, className=clase(j)) for j, valor in enumerate(fila)]) for fila in b["filas"]]),
+    ], className="c-tabla"), className="c-tabla-marco")
+
+
+GRUPOS_PESTANAS: list[tuple[str, int]] = []
+
+
+def pestanas(id_: str, titulos: list[str], contenidos: list) -> html.Div:
+    GRUPOS_PESTANAS.append((id_, len(titulos)))
+    return html.Div([
+        dcc.Tabs(id=id_, value="0", className="c-pestanas", children=[
+            dcc.Tab(label=titulo, value=str(i), className="c-pestana", selected_className="c-pestana-activa")
+            for i, titulo in enumerate(titulos)]),
+        *[html.Div(contenido, id=f"{id_}-{i}", style={"display": "block" if i == 0 else "none"})
+          for i, contenido in enumerate(contenidos)],
+    ])
+
+
+def bloque(b: dict):
+    tipo = b["tipo"]
+    if tipo == "parrafos":
+        vinculo = b.get("enlace")
+        return caja([html.Div([html.P(texto) for texto in b["parrafos"]], className="c-texto"),
+                     enlace(vinculo["texto"], vinculo["url"], "c-enlace") if vinculo else None], b["titulo"])
+    if tipo == "destacado":
+        return html.Div([html.Span(b["rotulo"], className="c-rotulo"), html.P(b["texto"])],
+                        className=f"c-destacado {b.get('tono', '')}".strip())
+    if tipo == "fichas":
+        return html.Div([html.Div([html.Div(item["etiqueta"], className="c-ficha-etiqueta"),
+                                   html.Div(item["valor"], className="c-ficha-valor"),
+                                   html.Div(item["nota"], className="c-ficha-nota")],
+                                  className=f"c-ficha {item.get('tono', '')}".strip()) for item in b["items"]], className="c-fichas")
+    if tipo == "lista":
+        items = [html.Div([html.Strong(item["rotulo"]), html.P(item["texto"])], className="c-item") for item in b["items"]]
+        return caja([html.Div(items, className="c-lista dos" if b.get("columnas") == 2 else "c-lista")], b["titulo"])
+    if tipo == "etapas":
+        return caja([html.Ol([html.Li([html.Strong(item["titulo"]), html.P(item["texto"])]) for item in b["items"]],
+                             className="c-etapas")], b["titulo"])
+    if tipo == "tabla":
+        return caja([tabla(b)], b["titulo"], b.get("meta"), b.get("nota"))
+    if tipo == "barras":
+        return caja([graph(figure=barras_figure(b))], b["titulo"], b["meta"], b["nota"])
+    if tipo == "ruta":
+        return caja([action_breakdown()], b["titulo"], None, b["nota"])
+    if tipo == "columnas":
+        return html.Div([bloque(hijo) for hijo in b["bloques"]], className="c-columnas")
+    if tipo == "pila":
+        return html.Div([bloque(hijo) for hijo in b["bloques"]], className="c-pila")
+    if tipo == "pestanas":
+        return pestanas(b["id"], [p["titulo"] for p in b["pestanas"]],
+                        [html.Div([bloque(hijo) for hijo in p["bloques"]], className="c-pila") for p in b["pestanas"]])
+    if tipo == "preguntas":
+        return html.Section([html.H2(acento(b["titulo"])),
+                             *[html.Details([html.Summary(item["pregunta"]), html.P(item["respuesta"])], className="pregunta")
+                               for item in b["items"]]], className="preguntas")
+    if tipo == "referencias":
+        return caja([html.Ol([html.Li([item["texto"], " ", enlace("Ver fuente", item["url"]) if item.get("url") else None])
+                              for item in b["items"]], className="c-referencias")], b["titulo"])
+    if tipo == "enlaces":
+        return caja([html.Ul([html.Li(enlace(item["texto"], item["url"])) for item in b["items"]], className="c-enlaces")], b["titulo"])
+    if tipo == "pie":
+        return html.P(b["texto"], className="c-pie")
+    raise ValueError(f"Bloque desconocido: {tipo}")
+
+
+def layout_contenido(clave: str) -> html.Div:
+    pagina = CONTENIDO["paginas"][clave]
+    cabecera = html.Div([html.H1(acento(pagina["titulo"])), html.P(pagina["entrada"], className="c-entrada")],
+                        className="c-cabecera") if "titulo" in pagina else None
+    return html.Div([cabecera, *[bloque(b) for b in pagina["bloques"]]], className="c-pagina")
 
 
 def dropdown(id_: str, label: str, options: list[str], multi: bool = False):
@@ -525,15 +544,28 @@ def selection_sentence(municipios, sexo, edad, zona, dificultad, n, positive, ce
                      html.Span(note, className="frase-base")], className="frase")
 
 
+def layout_comparar() -> html.Div:
+    explorar = CONTENIDO["explorar"]
+    return html.Div([
+        html.P(explorar["comparar_entrada"], className="c-entrada"),
+        dcc.RadioItems(id="comp-variable", options=[{"label": v["etiqueta"], "value": v["id"]} for v in explorar["variables"]],
+                       value=explorar["variables"][0]["id"], inline=True, className="segmented"),
+        html.Div(id="comp-lectura"),
+        caja([graph("comp-chart")], "Fuera de la ruta formal por categoría", "Porcentaje dentro de cada categoría"),
+        html.P(explorar["comparar_nota"], className="c-pie"),
+    ], className="c-pila")
+
+
 def layout_explorar() -> html.Div:
     municip = sorted({r["municipio"] for r in EDA["cube"]})
+    explorar = CONTENIDO["explorar"]
     return html.Div([
         html.Div([
             html.H1(["Elige un grupo y mira qué ", html.Em("cambia"), "."]),
             html.P("Compara la proporción cuya acción principal quedó fuera de EPS con atención o médico particular. Al filtrar cambian el grupo, su denominador y la cobertura publicable."
                    + omitted_municipios_sentence(municip, "en el selector", "ninguno de sus cruces cumple las reglas de publicación")),
         ], className="page-intro"),
-        html.Div([
+        pestanas("sub-explorar", explorar["pestanas"], [html.Div([
             html.Aside([
                 html.Div([
                     dropdown("f-municipio", "Municipio", municip, multi=True),
@@ -567,7 +599,7 @@ def layout_explorar() -> html.Div:
                 ], className="download-row"),
                 html.P(f"Protección de grupos pequeños: {EDA['metadata']['rules']} El cubo publicado cubre {str(EDA['metadata']['coverage_pct']).replace('.', ',')} % del universo clasificable antes de aplicar filtros.", className="source-line"),
             ], className="explorar-contenido"),
-        ], className="explorar-marco"),
+        ], className="explorar-marco"), layout_comparar(), html.Div([bloque(b) for b in explorar["ajuste"]], className="c-pila")]),
     ], className="page")
 
 
@@ -582,7 +614,7 @@ def layout_modelo() -> html.Div:
     # La marca numérica pegada al umbral validado pierde su texto para no superponerse.
     marks = {i / 20: (f"{i / 20:.2f}".replace(".", ",") if i % 2 == 0 and abs(i / 20 - chosen) >= 0.03 else "")
              for i in range(1, 17)}
-    marks[chosen] = {"label": "Validado", "style": {"color": RIO, "fontWeight": 600}}
+    marks[chosen] = {"label": "Validado", "style": {"color": DENTRO, "fontWeight": 600}}
     return html.Div([
         html.Div([
             html.H1(["Un modelo para ordenar perfiles, ", html.Em("con límites claros"), "."]),
@@ -653,10 +685,10 @@ def layout_modelo() -> html.Div:
     ], className="page")
 
 
-app = Dash(__name__, title="Salud Atlántico · DataViz", suppress_callback_exceptions=True)
+app = Dash(__name__, title=NOMBRE, suppress_callback_exceptions=True)
 app.index_string = app.index_string.replace(
     "{%css%}",
-    '<link rel="preload" href="/assets/fonts/ibm-plex-sans-latin-variable.woff2" as="font" type="font/woff2" crossorigin>{%css%}',
+    '<link rel="preload" href="/assets/fonts/plus-jakarta-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>{%css%}',
 )
 server = app.server
 
@@ -675,39 +707,48 @@ def informe(filename="index.html"):
     return send_from_directory(path, filename)
 
 
+def layout_pagina(clave: str) -> html.Div:
+    if clave == "panorama":
+        return html.Div([html.Div(id="relato"), layout_contenido(clave)])
+    if clave == "explorar":
+        return layout_explorar()
+    if clave == "modelo":
+        return layout_modelo()
+    return layout_contenido(clave)
+
+
 app.layout = html.Div([
     html.Header([
-        html.Div([html.Span(className="brand-dot"), html.Span("DATAVIZ", className="brand-main"), html.Span("/ Salud Atlántico", className="brand-sub")], className="brand"),
-        dcc.Tabs(id="nav", value="panorama", className="nav-tabs", children=[
-            dcc.Tab(label="Proyecto", value="panorama", className="nav-tab", selected_className="nav-tab-active"),
-            dcc.Tab(label="EDA", value="explorar", className="nav-tab", selected_className="nav-tab-active"),
-            dcc.Tab(label="Modelo y método", value="modelo", className="nav-tab", selected_className="nav-tab-active"),
-        ]),
-        html.A("Informe completo", href="/informe/", target="_blank", rel="noopener noreferrer", className="book-link"),
+        html.Div([html.Span(className="brand-dot"), html.Span(NOMBRE, className="brand-main")], className="brand"),
+        dcc.Tabs(id="nav", value=SECCIONES[0], className="nav-tabs", children=[
+            dcc.Tab(label=seccion["etiqueta"], value=seccion["id"], className="nav-tab", selected_className="nav-tab-active")
+            for seccion in CONTENIDO["secciones"]]),
     ], className="site-header"),
-    dcc.Store(id="vista-actual"),
-    html.Main([
-        html.Div(layout_panorama(), id="page-panorama"),
-        html.Div(layout_explorar(), id="page-explorar", style={"display": "none"}),
-        html.Div(layout_modelo(), id="page-modelo", style={"display": "none"}),
-    ]),
+    html.Main([html.Div(layout_pagina(clave), id=f"page-{clave}", style={"display": "block" if clave == SECCIONES[0] else "none"})
+               for clave in SECCIONES]),
     html.Footer([
-        html.Span("DATAVIZ · Análisis reproducible del Atlántico"),
-        html.Span([html.A("Aplicación Shiny", href="https://shiny-salud-atlantico-409319239507.us-east1.run.app/", target="_blank", rel="noopener noreferrer"), " · ",
+        html.Span(f"{NOMBRE} · CNPV 2018"),
+        html.Span([html.A("Informe completo", href="/informe/", target="_blank", rel="noopener noreferrer"), " · ",
+                   html.A("Aplicación Shiny", href="https://shiny-salud-atlantico-409319239507.us-east1.run.app/", target="_blank", rel="noopener noreferrer"), " · ",
                    html.A("Microdatos CNPV 2018 · DANE", href="https://microdatos.dane.gov.co/catalog/643",
                           target="_blank", rel="noopener noreferrer"), " · Cifras históricas"]),
     ], className="site-footer"),
 ], className="app-shell")
 
 
-# Cada vista empieza arriba, sin esperar al servidor.
-app.clientside_callback("function (vista) { window.scrollTo({ top: 0, behavior: 'instant' }); return vista; }",
-                        Output("vista-actual", "data"), Input("nav", "value"))
+# Cada sección empieza arriba y cambia sin esperar al servidor.
+app.clientside_callback(
+    "function (vista) { window.scrollTo({ top: 0, behavior: 'instant' }); "
+    # En pantallas angostas el menú se desplaza: la sección elegida queda a la vista.
+    "setTimeout(function () { var t = document.querySelector('.nav-tab-active'); if (t) t.scrollIntoView({ inline: 'center', block: 'nearest' }); }, 0); "
+    "return " + json.dumps(SECCIONES)
+    + ".map(function (id) { return { display: id === vista ? 'block' : 'none' }; }); }",
+    [Output(f"page-{clave}", "style") for clave in SECCIONES], Input("nav", "value"))
 
-
-@app.callback(Output("page-panorama", "style"), Output("page-explorar", "style"), Output("page-modelo", "style"), Input("nav", "value"))
-def switch_page(tab):
-    return tuple({"display": "block" if tab == name else "none"} for name in ("panorama", "explorar", "modelo"))
+for grupo, total in GRUPOS_PESTANAS:
+    app.clientside_callback(
+        "function (v) { var s = []; for (var i = 0; i < " + str(total) + "; i++) s.push({ display: String(i) === v ? 'block' : 'none' }); return s; }",
+        [Output(f"{grupo}-{i}", "style") for i in range(total)], Input(grupo, "value"))
 
 
 @app.callback(
@@ -759,6 +800,21 @@ def update_explore(municipios, sexo, edad, zona, dificultad, metric):
             composition, composition_note)
 
 
+@app.callback(Output("comp-lectura", "children"), Output("comp-chart", "figure"), Output("comp-chart", "style"),
+              Input("comp-variable", "value"))
+def update_comparar(clave):
+    variable = next(v for v in CONTENIDO["explorar"]["variables"] if v["id"] == clave)
+    categorias = variable["categorias"]
+    figura = barras_figure({"categorias": [c["categoria"] for c in categorias], "unidad": "%", "color": "fuera",
+                            "valores": [round(100 * c["sin_formal"] / c["n"], 1) for c in categorias],
+                            "bases": [c["n"] for c in categorias]})
+    lectura = html.Div([
+        html.Div([html.Span("V de Cramér", className="c-rotulo"), html.Strong(variable["v"], className="c-v")]),
+        html.Div([html.P(variable["rango"], className="c-rango"), html.P(variable["lectura"], className="c-lectura-texto")]),
+    ], className="c-lectura")
+    return lectura, figura, {"height": f"{int(figura.layout.height)}px", "width": "100%"}
+
+
 @app.callback(Output("threshold-title", "children"), Output("threshold-kpis", "children"),
               Output("confusion-chart", "figure"), Input("threshold", "value"))
 def update_threshold(value):
@@ -783,7 +839,7 @@ def download_selection(_clicks, municipios, sexo, edad, zona, dificultad):
     writer = csv.DictWriter(stream, fieldnames=["municipio", "sexo", "edad", "zona", "dificultad", "n", "sin_formal"])
     writer.writeheader()
     writer.writerows(rows)
-    return dict(content=stream.getvalue(), filename="dataviz_salud_agregados.csv", type="text/csv")
+    return dict(content=stream.getvalue(), filename="salud_atlantico_agregados.csv", type="text/csv")
 
 
 if __name__ == "__main__":
