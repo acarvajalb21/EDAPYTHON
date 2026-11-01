@@ -52,6 +52,18 @@ FEATURE_NAMES = {
     "SECCION_PCT_ENFERMOS": "Enfermos en la sección censal",
 }
 NUEVAS = {"HOGAR_OTROS_ENFERMOS", "SECCION_PCT_ENFERMOS"}
+PREGUNTAS = (
+    ("¿El 21,06 % significa que se negó la atención?",
+     "No. Es una clasificación de la acción principal declarada. Solo 1.907 de esas 28.650 personas acudieron a su EPS y no recibieron atención; las demás declararon otra acción o ninguna."),
+    ("¿Describe el Atlántico de hoy?",
+     "No. Son respuestas del censo de 2018 de quienes declararon un problema de salud reciente. No se extrapolan a otros años ni a toda la población."),
+    ("¿Por qué algunas tasas se ocultan?",
+     "Para proteger grupos pequeños y evitar lecturas engañosas. Una tasa se oculta si su base aproximada es menor de 200 personas o si la cobertura del filtro es menor de 80 %."),
+    ("¿Por qué las cifras filtradas no coinciden con el informe?",
+     "Las celdas pequeñas se suprimen y los recuentos se redondean. Por eso las cifras de las aplicaciones son aproximadas; las exactas están en el informe."),
+    ("¿El modelo dice qué hará una persona?",
+     "No. Ordena perfiles dentro del mismo censo, con discriminación moderada, y no debe usarse para decidir sobre personas. Este tablero no calcula predicciones individuales."),
+)
 # Los 23 municipios DIVIPOLA del Atlántico; mismos nombres que generar_datos.MUNICIPIOS.
 ATLANTICO_MUNICIPIOS = (
     "Barranquilla", "Baranoa", "Campo de la Cruz", "Candelaria", "Galapa", "Juan de Acosta",
@@ -123,8 +135,7 @@ def graph(id_: str | None = None, figure: go.Figure | None = None) -> dcc.Graph:
                        "composicion-chart": 360, "confusion-chart": 350}
     height = (int(figure.layout.height) if figure is not None and figure.layout.height
               else default_heights.get(id_, 350))
-    props = {"figure": figure, "config": {"displaylogo": False,
-                                        "toImageButtonOptions": {"format": "png", "scale": 2}},
+    props = {"figure": figure, "config": {"displayModeBar": False},
              "responsive": True, "style": {"height": f"{height}px", "width": "100%"},
              "className": "chart"}
     if id_ is not None:
@@ -249,7 +260,7 @@ def ranked_figure(rows: list[dict], metric: str, sexo, edad, zona, dificultad) -
                            marker_color=ARCILLA, customdata=[[r["n"]] for r in data],
                            hovertemplate=hover))
     fig.update_layout(xaxis_title=xlabel, yaxis_title="")
-    return figure_base(fig, height=max(360, 55 + 24 * len(data)), margin=dict(l=130, r=22, t=20, b=47))
+    return figure_base(fig, height=max(170, 67 + 24 * len(data)), margin=dict(l=130, r=22, t=20, b=47))
 
 
 def age_figure(rows: list[dict], municipios, sexo, zona, dificultad) -> go.Figure:
@@ -416,23 +427,7 @@ def layout_panorama() -> html.Div:
     source = EDA["metadata"]
     labels = source["label_breakdown_exact"]
     flow = source["population_flow"]
-    return html.Div([
-        html.Div([
-            html.Div([
-                html.H1("¿Qué ruta de atención se declaró ante un problema de salud?"),
-                html.P("Analizamos respuestas del CNPV 2018 en el Atlántico y las características relacionadas con la acción principal declarada.", className="hero-sub"),
-                html.Div([
-                    html.Span("CNPV 2018 · Atlántico · DANE"),
-                    html.Button("Explorar los datos", id="go-eda", className="hero-action"),
-                ], className="hero-actions"),
-            ], className="hero-copy"),
-            html.Div([
-                html.Div(fmt_pct(EXACT["sin_formal"] / EXACT["n"], 2), className="hero-stat"),
-                html.H2("Fuera de la ruta formal definida"),
-                html.P(f"{fmt_int(EXACT['sin_formal'])} de {fmt_int(EXACT['n'])} personas en la cohorte.", className="hero-base"),
-                html.P("Es una clasificación del tratamiento principal reportado. No equivale a atención denegada ni a ausencia de toda atención.", className="hero-caveat"),
-            ], className="hero-side"),
-        ], className="hero"),
+    return html.Div([html.Div(id="relato"), html.Div([
         html.Section([
             html.H2("Una respuesta del censo no cuenta toda la historia"),
             html.P("Ante un problema de salud, una persona pudo acudir a su entidad de seguridad social, consultar a un médico particular, buscar otra alternativa o no hacer nada. El CNPV registra cuál fue su tratamiento principal. Comparar esas respuestas ayuda a detectar patrones que merecen estudiarse mejor; no permite reconstruir toda la trayectoria de atención."),
@@ -487,9 +482,13 @@ def layout_panorama() -> html.Div:
               "Se muestran municipios con al menos 100 personas y 10 en cada clase; conteos redondeados a 10 antes de publicarse."
               + omitted_municipios_sentence([r["municipio"] for r in EDA["municipal_overview"]], "en esta vista", "no alcanza ese mínimo")
               + " Las diferencias pueden reflejar composición demográfica y otras características."),
+        html.Section([
+            html.H2(["Lo que conviene ", html.Em("preguntar")]),
+            *[html.Details([html.Summary(pregunta), html.P(respuesta)], className="pregunta") for pregunta, respuesta in PREGUNTAS],
+        ], className="preguntas"),
         html.P("Para consultar las definiciones, las tablas exactas y las decisiones metodológicas, abre el informe Bookdown desde el enlace superior.", className="source-line"),
-        html.P(f"Fuente: microdatos anonimizados del CNPV 2018, DANE. Universo: quienes reportaron problema de salud en los últimos 30 días sin hospitalización. Se excluyeron {fmt_int(flow['unclassifiable'])} respuestas no clasificables. Nombres municipales: DIVIPOLA del DANE.", className="source-line"),
-    ], className="page")
+        html.P(f"Fuente: microdatos anonimizados del CNPV 2018, DANE. Universo: quienes reportaron problema de salud en los últimos 30 días sin hospitalización. Se excluyeron {fmt_int(flow['unclassifiable'])} respuestas no clasificables. Nombres municipales: DIVIPOLA del DANE. Los cuadros del relato representan grupos, no personas reales.", className="source-line"),
+    ], className="page")])
 
 
 def dropdown(id_: str, label: str, options: list[str], multi: bool = False):
@@ -502,46 +501,73 @@ def dropdown(id_: str, label: str, options: list[str], multi: bool = False):
     ], className="filter")
 
 
+def selection_sentence(municipios, sexo, edad, zona, dificultad, n, positive, cells, trusted_rate) -> html.Div:
+    """Resume la selección; solo enuncia una tasa cuando las reglas lo permiten."""
+    place = "En el Atlántico" if not municipios else f"En {municipios[0]}" if len(municipios) == 1 else f"En {len(municipios)} municipios"
+    details = []
+    if edad != "Todos":
+        details.append("de 65 años o más" if edad == "65+" else f"de {edad} años")
+    if zona != "Todos":
+        details.append("de cabecera" if zona == "Cabecera" else "de centros poblados y rural disperso")
+    if dificultad != "Todos":
+        details.append(dificultad.lower())
+    who = {"Mujer": "entre mujeres", "Hombre": "entre hombres"}.get(sexo, "entre personas" if details else None)
+    group = f", {' '.join([who, *details])}" if who else ""
+    if trusted_rate:
+        base = f"Base aproximada: {fmt_int(n)} personas en {cells} {'cruce publicable' if cells == 1 else 'cruces publicables'}"
+        if len(municipios or []) == 1 and not who:
+            base += ". Se suman solo los cruces publicables, por eso puede diferir de la cifra del mapa."
+        return html.Div([html.P([f"{place}{group}, ", html.Strong(f"\u2248 {fmt_pct(positive / n)}"), " quedó fuera de la ruta formal."]),
+                         html.Span(base, className="frase-base")], className="frase")
+    note = ("Ningún cruce cumple las reglas de publicación. Prueba a quitar un filtro." if not cells
+            else f"\u2248 {fmt_int(n)} personas en cruces publicables. La protección de grupos pequeños oculta la tasa.")
+    return html.Div([html.P([f"{place}{group}, esta selección ", html.Em("no permite mostrar una tasa"), "."]),
+                     html.Span(note, className="frase-base")], className="frase")
+
+
 def layout_explorar() -> html.Div:
     municip = sorted({r["municipio"] for r in EDA["cube"]})
     return html.Div([
         html.Div([
-            html.H2("Explora los datos"),
-            html.P("Compara las respuestas de 2018 por municipio, edad, sexo, zona y dificultad funcional. Los filtros usan cruces publicables; la comparación general por sexo y zona se calcula aparte con grupos amplios."
+            html.H1(["Elige un grupo y mira qué ", html.Em("cambia"), "."]),
+            html.P("Compara la proporción cuya acción principal quedó fuera de EPS con atención o médico particular. Al filtrar cambian el grupo, su denominador y la cobertura publicable."
                    + omitted_municipios_sentence(municip, "en el selector", "ninguno de sus cruces cumple las reglas de publicación")),
         ], className="page-intro"),
-        html.P([html.Strong("Qué se compara: "), "la proporción cuya acción principal quedó fuera de EPS con atención o médico particular. Al filtrar cambian el grupo, su denominador y la cobertura publicable."], className="eda-definition"),
         html.Div([
-            dropdown("f-municipio", "Municipio", municip, multi=True),
-            dropdown("f-sexo", "Sexo reportado", ["Todos", "Hombre", "Mujer"]),
-            dropdown("f-edad", "Edad", ["Todos"] + AGE_ORDER),
-            dropdown("f-zona", "Zona", ["Todos", "Cabecera", "Centros poblados y rural disperso"]),
-            dropdown("f-dificultad", "Dificultad funcional diaria", ["Todos", "Con dificultad funcional", "Sin dificultad funcional"]),
-        ], className="filter-grid"),
-        html.Div([
-            html.Div(id="explore-kpis", className="kpi-grid two"),
-            html.Div(id="coverage-note", className="coverage-note"),
-        ]),
-        html.Div([
-            panel("Municipios en la selección", html.Div([
-                dcc.RadioItems(id="metric-toggle", options=[{"label": "Porcentaje", "value": "tasa"},
-                                                            {"label": "Personas", "value": "conteo"}],
-                               value="tasa", inline=True, className="segmented"),
-                graph("municipio-chart"),
-            ]), "COMPARAR TERRITORIOS", RULE_NOTE),
-            panel("Cómo cambia por edad", graph("edad-chart"), "PERFIL POR DIFICULTAD",
-                  "Porcentajes dentro de cada grupo publicado; los cruces omitidos no entran en la línea."),
-        ], className="two-col"),
-        panel("Sexo y zona de residencia", html.Div([graph("composicion-chart"),
-                                                    html.P(id="composition-note", className="chart-explanation")]), "OTRA MIRADA",
-              "La comparación es descriptiva; los grupos pueden diferir en edad, municipio y otras condiciones."),
-        html.Div([
-            html.Button("Descargar selección agregada", id="download-button", className="download-button"),
-            dcc.Download(id="download-data"),
-            html.Span("El archivo contiene solo celdas publicables y recuentos redondeados.", className="download-note"),
-        ], className="download-row"),
-        html.P(RULE_NOTE, className="source-line"),
-        html.P(f"Protección de grupos pequeños: {EDA['metadata']['rules']} El cubo publicado cubre {str(EDA['metadata']['coverage_pct']).replace('.', ',')} % del universo clasificable antes de aplicar filtros.", className="source-line"),
+            html.Aside([
+                html.Div([
+                    dropdown("f-municipio", "Municipio", municip, multi=True),
+                    dropdown("f-sexo", "Sexo reportado", ["Todos", "Hombre", "Mujer"]),
+                    dropdown("f-edad", "Edad", ["Todos"] + AGE_ORDER),
+                    dropdown("f-zona", "Zona", ["Todos", "Cabecera", "Centros poblados y rural disperso"]),
+                    dropdown("f-dificultad", "Dificultad funcional diaria", ["Todos", "Con dificultad funcional", "Sin dificultad funcional"]),
+                ], className="filter-grid"),
+                html.Div(id="coverage-note", className="coverage-note"),
+            ], className="riel", **{"aria-label": "Filtros"}),
+            html.Div([
+                html.Div(id="frase"),
+                html.Div(id="nota-referencia"),
+                panel("Municipios en la selección", html.Div([
+                    dcc.RadioItems(id="metric-toggle", options=[{"label": "Porcentaje", "value": "tasa"},
+                                                                {"label": "Personas", "value": "conteo"}],
+                                   value="tasa", inline=True, className="segmented"),
+                    graph("municipio-chart"),
+                ]), "COMPARAR TERRITORIOS", RULE_NOTE),
+                html.Div([
+                    panel("Cómo cambia por edad", graph("edad-chart"), "PERFIL POR DIFICULTAD",
+                          "Porcentajes dentro de cada grupo publicado; los cruces omitidos no entran en la línea."),
+                    panel("Sexo y zona de residencia", html.Div([graph("composicion-chart"),
+                                                                html.P(id="composition-note", className="chart-explanation")]), "OTRA MIRADA",
+                          "La comparación es descriptiva; los grupos pueden diferir en edad, municipio y otras condiciones."),
+                ], className="two-col"),
+                html.Div([
+                    html.Button("Descargar selección agregada", id="download-button", className="download-button"),
+                    dcc.Download(id="download-data"),
+                    html.Span("El archivo contiene solo celdas publicables y recuentos redondeados.", className="download-note"),
+                ], className="download-row"),
+                html.P(f"Protección de grupos pequeños: {EDA['metadata']['rules']} El cubo publicado cubre {str(EDA['metadata']['coverage_pct']).replace('.', ',')} % del universo clasificable antes de aplicar filtros.", className="source-line"),
+            ], className="explorar-contenido"),
+        ], className="explorar-marco"),
     ], className="page")
 
 
@@ -559,7 +585,7 @@ def layout_modelo() -> html.Div:
     marks[chosen] = {"label": "Validado", "style": {"color": RIO, "fontWeight": 600}}
     return html.Div([
         html.Div([
-            html.H2("Un modelo para ordenar perfiles, con límites claros"),
+            html.H1(["Un modelo para ordenar perfiles, ", html.Em("con límites claros"), "."]),
             html.P("Comparamos cuatro enfoques. El mejor entre los probados fue boosting de histogramas. Sus resultados corresponden a viviendas reservadas del mismo censo de 2018."),
         ], className="page-intro"),
         html.Div([
@@ -570,7 +596,7 @@ def layout_modelo() -> html.Div:
         ], className="kpi-grid model-metrics"),
         html.Section([
             html.Div([
-                html.H3("Qué cambió en esta versión"),
+                html.H2(["Qué ", html.Em("cambió"), " en esta versión"]),
                 html.P(f"Las {audit['alternatives']} alternativas de preparación de datos y ajuste probadas antes no mejoraron el modelo de 26 variables. "
                        "La mejora llegó con dos variables de contexto: cuántas personas más del hogar declararon un problema de salud y qué proporción lo declaró en la sección censal. "
                        f"El AP de validación pasó de {ap_text(change['previous_validation_ap'])} a {ap_text(change['new_validation_ap'])}, y en secciones no vistas al ajustar, "
@@ -650,16 +676,16 @@ def informe(filename="index.html"):
 
 
 app.layout = html.Div([
-    html.Div([
-        html.Div([html.Span(className="brand-dot"), html.Span("DATAVIZ", className="brand-main"), html.Span("/ SALUD ATLÁNTICO", className="brand-sub")], className="brand"),
-        html.Div("CNPV 2018 · DANE", className="header-source"),
+    html.Header([
+        html.Div([html.Span(className="brand-dot"), html.Span("DATAVIZ", className="brand-main"), html.Span("/ Salud Atlántico", className="brand-sub")], className="brand"),
+        dcc.Tabs(id="nav", value="panorama", className="nav-tabs", children=[
+            dcc.Tab(label="Proyecto", value="panorama", className="nav-tab", selected_className="nav-tab-active"),
+            dcc.Tab(label="EDA", value="explorar", className="nav-tab", selected_className="nav-tab-active"),
+            dcc.Tab(label="Modelo y método", value="modelo", className="nav-tab", selected_className="nav-tab-active"),
+        ]),
+        html.A("Informe completo", href="/informe/", target="_blank", rel="noopener noreferrer", className="book-link"),
     ], className="site-header"),
-    dcc.Tabs(id="nav", value="panorama", className="nav-tabs", children=[
-        dcc.Tab(label="Proyecto", value="panorama", className="nav-tab", selected_className="nav-tab-active"),
-        dcc.Tab(label="EDA", value="explorar", className="nav-tab", selected_className="nav-tab-active"),
-        dcc.Tab(label="Modelo y método", value="modelo", className="nav-tab", selected_className="nav-tab-active"),
-    ]),
-    html.Div(html.A("Leer informe completo", href="/informe/", target="_blank", rel="noopener noreferrer", className="book-link"), className="book-link-wrap"),
+    dcc.Store(id="vista-actual"),
     html.Main([
         html.Div(layout_panorama(), id="page-panorama"),
         html.Div(layout_explorar(), id="page-explorar", style={"display": "none"}),
@@ -674,18 +700,18 @@ app.layout = html.Div([
 ], className="app-shell")
 
 
+# Cada vista empieza arriba, sin esperar al servidor.
+app.clientside_callback("function (vista) { window.scrollTo({ top: 0, behavior: 'instant' }); return vista; }",
+                        Output("vista-actual", "data"), Input("nav", "value"))
+
+
 @app.callback(Output("page-panorama", "style"), Output("page-explorar", "style"), Output("page-modelo", "style"), Input("nav", "value"))
 def switch_page(tab):
     return tuple({"display": "block" if tab == name else "none"} for name in ("panorama", "explorar", "modelo"))
 
 
-@app.callback(Output("nav", "value"), Input("go-eda", "n_clicks"), prevent_initial_call=True)
-def go_to_eda(_clicks):
-    return "explorar"
-
-
 @app.callback(
-    Output("explore-kpis", "children"), Output("coverage-note", "children"),
+    Output("frase", "children"), Output("coverage-note", "children"), Output("nota-referencia", "children"),
     Output("municipio-chart", "figure"), Output("municipio-chart", "style"),
     Output("edad-chart", "figure"), Output("composicion-chart", "figure"),
     Output("composition-note", "children"),
@@ -699,14 +725,7 @@ def update_explore(municipios, sexo, edad, zona, dificultad, metric):
     coverage_pct = coverage_for(municipios, sexo, edad, zona, dificultad)
     trusted_rate = safe_to_rate(n, coverage_pct)
     reference = None if trusted_rate else reference_aggregate(municipios, sexo, edad, zona, dificultad)
-    hidden_note = ("Se oculta en los cruces filtrables; ver la referencia de abajo" if reference
-                   else "Se oculta para evitar una lectura engañosa")
-    kpis = [
-        card("Personas representadas", "≈ " + fmt_int(n) if rows else "Sin cruces publicables",
-             "Suma de celdas publicables redondeadas" if rows else "Ninguna celda de esta selección cumple las reglas de publicación"),
-        card("Acción principal fuera de ruta formal", fmt_pct(positive / n) if trusted_rate else "Cobertura insuficiente",
-             "Proporción aproximada en celdas publicables" if trusted_rate else hidden_note, "coral"),
-    ]
+    sentence = selection_sentence(municipios, sexo, edad, zona, dificultad, n, positive, len(rows), trusted_rate)
     coverage_text = "sin estimación publicable" if coverage_pct is None else f"al menos {coverage_pct} %"
     interpretation = (
         "La tasa mostrada describe los cruces publicados y puede diferir de la tasa de toda la subpoblación."
@@ -717,7 +736,7 @@ def update_explore(municipios, sexo, edad, zona, dificultad, metric):
     state_label = {"visible": "\u2713 Tasa visible", "oculta": "\u2298 Tasa oculta", "sin-datos": "\u2298 Sin cruces publicables"}[state]
     coverage_label = f"Cobertura: {coverage_text}" + (" (límite conservador por municipio)" if municipios and len(municipios) > 1 else "")
     coverage = [html.Div([
-        html.Div([html.Strong(state_label), html.Span(f"{len(rows)} cruces publicables en esta selección. {interpretation}")], className="cinta-texto"),
+        html.Div([html.Strong(state_label), html.Span(f"{len(rows)} {'cruce publicable' if len(rows) == 1 else 'cruces publicables'} en esta selección. {interpretation}")], className="cinta-texto"),
         html.Div([
             html.Div(coverage_label, className="cinta-rotulo"),
             html.Div([html.Div(className="cinta-relleno", style={"width": f"{coverage_pct or 0}%"}),
@@ -725,16 +744,17 @@ def update_explore(municipios, sexo, edad, zona, dificultad, metric):
                      className="cinta-pista", role="img", **{"aria-label": f"{coverage_label}; umbral de publicación 80 %"}),
         ], className="cinta-medida"),
     ], className=f"cinta {state}")]
+    note = None
     if reference:
         label, ref, source = reference
-        coverage.append(html.Span(
+        note = html.P(
             f"Referencia sin cruces adicionales: «{label}» registra ≈ {fmt_pct(ref['sin_formal'] / ref['n'])} sobre una base aproximada de "
             f"{fmt_int(ref['n'])} personas en {source}. Ese agregado se publica aparte, con conteos redondeados a 10, y no procede de las celdas filtrables.",
-            className="coverage-reference"))
+            className="coverage-reference")
     ranked = ranked_figure(rows, metric, sexo, edad, zona, dificultad)
     ranked_style = {"height": f"{int(ranked.layout.height)}px", "width": "100%"}
     composition, composition_note = composition_figure(rows, municipios, sexo, edad, zona, dificultad)
-    return (kpis, coverage, ranked, ranked_style,
+    return (sentence, coverage, note, ranked, ranked_style,
             age_figure(rows, municipios, sexo, zona, dificultad),
             composition, composition_note)
 
