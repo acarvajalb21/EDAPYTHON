@@ -55,11 +55,15 @@ Abra `http://localhost:8050`. Para regenerar los agregados, instale también
 `python -m dash_salud.generar_datos --data-dir RUTA_CSV_DANE`. El generador usa el entorno de entrenamiento
 de `ml_salud` (pandas, scikit-learn y joblib compatibles con el modelo).
 La aplicación publicada requiere únicamente Dash, Plotly y Gunicorn.
-La interfaz y las gráficas usan Plus Jakarta Sans y los titulares, Bricolage
-Grotesque. Los archivos se sirven desde `assets/fonts/`, con sus licencias OFL.
+La interfaz y las gráficas usan Atkinson Hyperlegible Next y los titulares,
+Bricolage Grotesque. Los archivos se sirven desde `assets/fonts/`, con sus licencias OFL.
 
 El Bookdown renderizado se copia a `dash_salud/informe/` con `index.html` y
 sus recursos. El enlace «Informe completo» del pie abre `/informe/`.
+
+## Asistente
+
+El chatbot del proyecto está documentado en [`ASISTENTE.md`](ASISTENTE.md).
 
 ## Publicar en Google Cloud Run
 

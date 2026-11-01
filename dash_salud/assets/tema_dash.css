@@ -1,0 +1,62 @@
+/* Ajustes propios de Dash sobre tema.css. */
+
+/* Dash 4 pinta sus controles con estas variables. */
+html:root {
+  --Dash-Fill-Interactive-Strong: #2454D6;
+  --Dash-Fill-Interactive-Weak: #DCE5F5;
+  --Dash-Fill-Primary-Hover: #E9EDF2;
+  --Dash-Fill-Primary-Active: #DCE5F5;
+  --Dash-Fill-Inverse-Strong: #F5F7FA;
+  --Dash-Stroke-Strong: #556378;
+  --Dash-Stroke-Weak: rgba(20, 35, 58, .15);
+  --Dash-Text-Primary: #14233A;
+  --Dash-Text-Strong: #14233A;
+  --Dash-Text-Weak: #3B4A60;
+  --Dash-Text-Disabled: #556378;
+}
+
+/* Cabecera con la ruta de paradas */
+.site-header { align-items: center; background: var(--noche); color: var(--claro); display: flex; gap: 32px; height: var(--cabecera); padding: 0 max(24px, calc((100vw - var(--ancho)) / 2 + 24px)); position: sticky; top: 0; z-index: 30; }
+.site-header .tab-parent, .site-header > div:last-child { flex: 1 1 auto; min-width: 0; }
+.nav-tabs { background: transparent; border: 0; display: flex !important; flex-direction: row !important; flex-wrap: nowrap; justify-content: flex-end; overflow-x: auto; scrollbar-width: none; }
+.nav-tabs::-webkit-scrollbar { display: none; }
+.nav-tabs > .nav-tab, .nav-tabs > div { background: transparent !important; border: 0 !important; color: var(--claro-suave) !important; cursor: pointer; flex: 0 0 auto !important; font-size: .9rem; font-weight: 500; line-height: 1.2; min-width: 0; padding: 34px 18px 10px 11px !important; position: relative; text-align: left; white-space: nowrap; width: auto !important; }
+.nav-tabs > div::after { background: var(--hilo-claro); content: ""; height: 3px; left: 0; position: absolute; right: 0; top: 19px; }
+.nav-tabs > div:first-child::after { left: 11px; }
+.nav-tabs > div:last-child::after { right: auto; width: 11px; }
+.nav-tabs > div::before { background: var(--noche); border: 3px solid var(--claro-suave); border-radius: 50%; content: ""; height: 13px; left: 11px; position: absolute; top: 14px; width: 13px; z-index: 1; }
+.nav-tabs > div:hover { color: var(--claro) !important; }
+.nav-tabs > div:has(~ .nav-tab-active)::after, .nav-tabs > .nav-tab-active::after { background: var(--acento); }
+.nav-tabs > .nav-tab-active::after { right: auto; width: 24px; }
+.nav-tabs > div:has(~ .nav-tab-active)::before { background: var(--acento); border-color: var(--acento); }
+.nav-tabs > .nav-tab-active { color: var(--claro) !important; font-weight: 700; }
+.nav-tabs > .nav-tab-active::before { background: var(--acento); border-color: var(--acento); box-shadow: 0 0 0 3px var(--noche), 0 0 0 5px var(--acento); }
+
+/* Pestañas internas */
+.c-pestanas { background: transparent; border: 0 !important; display: flex !important; flex-direction: row !important; flex-wrap: nowrap; gap: 26px; margin-bottom: 26px; overflow-x: auto; scrollbar-width: none; }
+.c-pestanas > div { background: transparent !important; border: 0 !important; border-bottom: 4px solid transparent !important; color: var(--tinta-media) !important; cursor: pointer; flex: 0 0 auto !important; font-size: 1rem; font-weight: 600; padding: 6px 0 6px !important; white-space: nowrap; width: auto !important; }
+.c-pestanas > div:hover { color: var(--tinta) !important; }
+.c-pestanas > .c-pestana-activa { border-bottom-color: var(--tinta) !important; color: var(--tinta) !important; font-weight: 700; }
+
+/* Filtros */
+.seleccion .dash-dropdown, .seleccion .dash-dropdown-wrapper, .seleccion [class*="dropdown-trigger"] { background: var(--pliego); border-color: transparent !important; border-radius: var(--radio); color: var(--tinta); min-height: 44px; }
+.seleccion .dash-dropdown-value, .seleccion .dash-dropdown-placeholder { color: var(--tinta); font-size: 1rem; }
+.seleccion .filtro > label { width: 100%; }
+
+/* Deslizador del umbral */
+.laboratorio .dash-slider-root, .laboratorio .rc-slider { margin: 20px 0 28px; }
+.dash-graph, .js-plotly-plot { min-width: 0; }
+
+@media (max-width: 1320px) {
+  :root { --cabecera: 104px; }
+  .site-header { align-content: center; flex-wrap: wrap; gap: 2px 24px; padding-bottom: 2px; padding-top: 6px; }
+  .site-header .marca { flex: 1 0 100%; }
+  .nav-tabs { justify-content: flex-start; }
+  .nav-tabs > div { padding-top: 28px !important; padding-bottom: 4px !important; }
+  .nav-tabs > div::after { top: 13px; }
+  .nav-tabs > div::before { top: 8px; }
+}
+@media (max-width: 760px) {
+  :root { --cabecera: 96px; }
+  .site-header { padding-left: 16px; padding-right: 16px; }
+}

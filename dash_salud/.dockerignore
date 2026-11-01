@@ -8,6 +8,8 @@ __pycache__/
 generar_datos.py
 generar_relato.py
 generar_contenido.py
+generar_conocimiento.py
+pruebas_asistente.py
 pruebas.py
 deploy_cloud_run.ps1
 deploy_cloud_shell.sh

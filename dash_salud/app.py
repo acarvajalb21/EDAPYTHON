@@ -5,13 +5,16 @@ from __future__ import annotations
 import csv
 import io
 import json
+import os
 import textwrap
 from collections import defaultdict
 from pathlib import Path
 
 import plotly.graph_objects as go
 from dash import Dash, Input, Output, State, dcc, html
-from flask import abort, send_from_directory
+from flask import abort, jsonify, request, send_from_directory
+
+from dash_salud.asistente import LARGO_MAXIMO, Asistente
 
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
@@ -25,22 +28,22 @@ CONTENIDO = json.loads((DATA_DIR / "contenido.json").read_text(encoding="utf-8")
 NOMBRE = CONTENIDO["nombre"]
 SECCIONES = [seccion["id"] for seccion in CONTENIDO["secciones"]]
 
-# Tokens de color. FUERA significa siempre «fuera de la ruta formal» y DENTRO, «dentro».
-TINTA = "#141C33"
-TINTA_MEDIA = "#434C66"
-TINTA_SUAVE = "#5D6680"
-HILO = "#DFE3EE"
-HOJA = "#FFFFFF"
+# Tokens de color (ver DISENO.md). FUERA y DENTRO significan siempre lo mismo.
+TINTA = "#14233A"
+TINTA_MEDIA = "#3B4A60"
+TINTA_SUAVE = "#556378"
+HILO = "rgba(20, 35, 58, .13)"
+SUELO = "#E9EDF2"
 DENTRO = "#2454D6"
-FUERA = "#E8505B"
-GRUPO_A = "#008F88"
-GRUPO_B = "#BC7A00"
-REFERENCIA = "#9097A8"
-BASE = "#C3C9D8"
+FUERA = "#D93F4C"
+GRUPO_A = "#00908A"
+GRUPO_B = "#A86C00"
+REFERENCIA = "#7C8799"
+BASE = "#A9B4C2"
+FUENTE = "Atkinson Hyperlegible Next, Segoe UI, Arial, sans-serif"
 AGE_ORDER = EDA["metadata"]["age_bands"]
-RULE_NOTE = "Cruces publicables del censo de 2018; recuentos redondeados a 5. Se omiten celdas pequeñas. Las gráficas basadas en esos cruces ocultan tasas con menos de 80 % de cobertura o base aproximada menor de 200."
 MODEL_NAMES = {
-    "baseline": "Referencia por prevalencia",
+    "baseline": "Referencia (prevalencia)",
     "logistica": "Regresión logística",
     "random_forest": "Bosque aleatorio",
     "hist_gradient_boosting": "Boosting de histogramas",
@@ -88,75 +91,37 @@ def omitted_municipios_sentence(present, place: str, reason: str) -> str:
     return f" {', '.join(missing)} {verb} {place}: {reason}."
 
 
-def figure_base(fig: go.Figure, height: int = 370, margin: dict | None = None) -> go.Figure:
+def figure_base(fig: go.Figure, height: int = 370, margin: dict | None = None, legend: bool = False) -> go.Figure:
+    eje = dict(gridcolor=HILO, zeroline=False, linecolor=BASE, tickcolor=BASE, fixedrange=True, automargin=True,
+               title_font=dict(color=TINTA_SUAVE, size=13))
     fig.update_layout(
-        height=height, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", separators=",.",
-        font=dict(family="Plus Jakarta Sans, Segoe UI, Arial, sans-serif", color=TINTA_MEDIA, size=13),
-        margin=margin or dict(l=32, r=25, t=30, b=42),
-        hoverlabel=dict(bgcolor=TINTA, font_color="white", font_family="Plus Jakarta Sans, Segoe UI, Arial, sans-serif"),
-        xaxis=dict(gridcolor=HILO, zeroline=False),
-        yaxis=dict(gridcolor=HILO, zeroline=False),
-        legend=dict(orientation="h", y=-0.22),
+        height=height, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", separators=",.", showlegend=legend,
+        font=dict(family=FUENTE, color=TINTA_MEDIA, size=14),
+        margin=margin or dict(l=52, r=18, t=10, b=46),
+        hoverlabel=dict(bgcolor=TINTA, bordercolor=TINTA, align="left", font=dict(family=FUENTE, color="#FFFFFF", size=14)),
+        xaxis=eje, yaxis=eje,
+        legend=dict(orientation="h", x=0, y=1.1, xanchor="left", yanchor="bottom", font=dict(color=TINTA_MEDIA)),
     )
     return fig
 
 
-def card(label: str, value: str, note: str, tone: str = "teal") -> html.Div:
-    return html.Div([
-        html.Div(label, className="kpi-label"),
-        html.Div(value, className="kpi-value"),
-        html.Div(note, className="kpi-note"),
-    ], className=f"kpi-card {tone}")
-
-
-def panel(title: str, child, eyebrow: str | None = None, note: str | None = None) -> html.Div:
-    return html.Div([
-        html.Div([
-            html.H3(title),
-            html.Span(eyebrow, className="panel-meta") if eyebrow else None,
-        ], className="panel-heading"),
-        child,
-        html.P(note, className="panel-note") if note else None,
-    ], className="panel")
+def ficha(etiqueta: str, valor: str, nota: str, tono: str = "") -> html.Div:
+    return html.Div([html.Div(etiqueta, className="c-ficha-etiqueta"), html.Div(valor, className="c-ficha-valor"),
+                     html.Div(nota, className="c-ficha-nota")], className=f"c-ficha {tono}".strip())
 
 
 def graph(id_: str | None = None, figure: go.Figure | None = None) -> dcc.Graph:
     # Plotly observa el tamaño del contenedor. Sin una altura explícita, ese
     # contenedor crece con el gráfico y dispara un ciclo de redimensionamiento.
-    default_heights = {"municipio-chart": 360, "edad-chart": 350,
-                       "composicion-chart": 360, "confusion-chart": 350}
+    default_heights = {"municipio-chart": 360, "edad-chart": 320, "composicion-chart": 320}
     height = (int(figure.layout.height) if figure is not None and figure.layout.height
               else default_heights.get(id_, 350))
     props = {"figure": figure, "config": {"displayModeBar": False},
              "responsive": True, "style": {"height": f"{height}px", "width": "100%"},
-             "className": "chart"}
+             "className": "grafica"}
     if id_ is not None:
         props["id"] = id_
     return dcc.Graph(**props)
-
-
-def action_breakdown() -> html.Div:
-    labels = EDA["metadata"]["label_breakdown_exact"]
-    routes = [
-        ("EPS y recibió atención", labels["eps_atendido"], "route-dentro"),
-        ("Otra acción principal o ninguna", labels["otras_acciones_o_ninguna"], "route-fuera"),
-        ("Médico particular", labels["medico_particular"], "route-dentro"),
-        ("EPS sin atención", labels["eps_no_atendido"], "route-fuera"),
-    ]
-    return html.Div([
-        html.P(f"De {fmt_int(EXACT['n'])} personas con respuesta clasificable", className="route-denominator"),
-        *[html.Div([
-            html.Div([
-                html.Span(name, className="route-name"),
-                html.Strong([fmt_int(value), html.Span(" personas", className="route-unit"),
-                             html.Span(fmt_pct(value / EXACT["n"]), className="route-share")],
-                            className="route-value"),
-            ], className="route-line"),
-            html.Div(html.Div(className=f"route-fill {tone}",
-                              style={"width": f"{100 * value / EXACT['n']:.3f}%"}),
-                     className="route-track", **{"aria-hidden": "true"}),
-        ], className="route-row") for name, value, tone in routes],
-    ], className="route-breakdown")
 
 
 def filter_cube(municipios, sexo, edad, zona, dificultad) -> list[dict]:
@@ -238,8 +203,9 @@ def ranked_figure(rows: list[dict], metric: str, sexo, edad, zona, dificultad) -
     fig = go.Figure(go.Bar(x=x, y=[r["municipio"] for r in data], orientation="h",
                            marker_color=FUERA, customdata=[[r["n"]] for r in data],
                            hovertemplate=hover))
-    fig.update_layout(xaxis_title=xlabel, yaxis_title="")
-    return figure_base(fig, height=max(170, 67 + 24 * len(data)), margin=dict(l=130, r=22, t=20, b=47))
+    fig.update_layout(xaxis_title=xlabel, yaxis_title="", bargap=0.34)
+    fig.update_yaxes(gridcolor="rgba(0,0,0,0)", ticks="")
+    return figure_base(fig, height=max(170, 58 + 25 * len(data)), margin=dict(l=8, r=18, t=6, b=44))
 
 
 def age_figure(rows: list[dict], municipios, sexo, zona, dificultad) -> go.Figure:
@@ -255,11 +221,11 @@ def age_figure(rows: list[dict], municipios, sexo, zona, dificultad) -> go.Figur
         keys = [age for age in AGE_ORDER if age in group]
         if keys:
             fig.add_scatter(x=keys, y=[100 * group[age]["sin_formal"] / group[age]["n"] for age in keys],
-                            mode="lines+markers", name=label, line=dict(color=color, width=2.5), marker=dict(size=10, line=dict(color=HOJA, width=2)),
+                            mode="lines+markers", name=label, line=dict(color=color, width=2.5), marker=dict(size=10, line=dict(color=SUELO, width=2)),
                             customdata=[[group[age]["n"]] for age in keys],
                             hovertemplate="%{x}<br>%{y:.1f} % aprox.<br>Base: %{customdata[0]:,}<extra>" + label + "</extra>")
-    fig.update_layout(xaxis_title="Edad", yaxis_title="Porcentaje aproximado (%)")
-    return figure_base(fig, height=350)
+    fig.update_layout(xaxis_title="Edad", yaxis_title="Fuera de la ruta formal (%)")
+    return figure_base(fig, height=320, legend=True, margin=dict(l=52, r=18, t=34, b=46))
 
 
 def composition_figure(rows: list[dict], municipios, sexo, edad, zona, dificultad) -> tuple[go.Figure, str]:
@@ -268,9 +234,8 @@ def composition_figure(rows: list[dict], municipios, sexo, edad, zona, dificulta
         data = [r for r in EDA["zone_sex_summary"]
                 if (sexo == "Todos" or r["sexo"] == sexo)
                 and (zona == "Todos" or r["zona"] == zona)]
-        note = ("Cómo leerla: cada barra muestra, de cada 100 personas de ese sexo y zona, "
-                "cuántas quedaron fuera de la ruta formal definida. Se usa toda la cohorte; "
-                "los recuentos se redondean a 10 y los porcentajes son aproximados.")
+        note = ("Cada barra muestra, de cada 100 personas de ese sexo y zona, cuántas quedaron fuera de la ruta formal. "
+                "Se usan todas las personas estudiadas y los recuentos se redondean a 10.")
     else:
         grouped = aggregate(rows, ("zona", "sexo"))
         data = [r for r in grouped if safe_to_rate(
@@ -278,9 +243,8 @@ def composition_figure(rows: list[dict], municipios, sexo, edad, zona, dificulta
         )]
         omitted = len(grouped) - len(data)
         note = ("Cada barra usa como base a las personas de ese sexo y zona dentro del filtro. "
-                "Comparación basada en cruces publicables. "
                 + (f"Se omiten {omitted} grupos por tamaño o cobertura insuficiente. " if omitted else "")
-                + "Los porcentajes son aproximados y pueden no representar a toda la subpoblación filtrada.")
+                + "Los porcentajes son aproximados y pueden no representar a todo el grupo filtrado.")
     if not data:
         return empty_figure("No hay grupos con cobertura suficiente para comparar"), note
     fig = go.Figure()
@@ -296,12 +260,12 @@ def composition_figure(rows: list[dict], municipios, sexo, edad, zona, dificulta
         fig.add_bar(x=present, y=values, name=label, marker_color=color, customdata=bases,
                     text=[fmt_pct(value / 100) for value in values], textposition="outside",
                     hovertemplate="%{x}<br>%{y:.1f} % aprox.<br>Base: %{customdata[0]} personas<extra>" + label + "</extra>")
-    fig.update_layout(barmode="group", yaxis_title="Fuera de ruta formal (%)", xaxis_title="",
+    fig.update_layout(barmode="group", yaxis_title="Fuera de la ruta formal (%)", xaxis_title="", bargap=0.34,
                       uniformtext=dict(mode="show", minsize=11))
     fig.update_xaxes(tickmode="array", tickvals=zones,
                      ticktext=["Cabecera" if z == "Cabecera" else "Centros poblados<br>y rural disperso" for z in zones])
     fig.update_yaxes(range=[0, max(100 * r["sin_formal"] / r["n"] for r in data) * 1.18])
-    return figure_base(fig, height=360, margin=dict(l=62, r=25, t=30, b=95)), note
+    return figure_base(fig, height=320, legend=True, margin=dict(l=52, r=18, t=34, b=50)), note
 
 
 def comparison_figure() -> go.Figure:
@@ -312,45 +276,42 @@ def comparison_figure() -> go.Figure:
         y=[MODEL["models"][k]["test"]["pr_auc"] for k in keys],
         marker_color=[REFERENCIA, BASE, BASE, DENTRO],
         text=[f"{MODEL['models'][k]['test']['pr_auc']:.3f}".replace(".", ",") for k in keys],
-        textposition="outside", hovertemplate="%{x}<br>Average Precision: %{y:.3f}<extra></extra>",
+        textposition="outside", hovertemplate="%{x}<br>Precisión promedio: %{y:.3f}<extra></extra>",
     ))
-    fig.update_layout(yaxis_title="Average Precision (AP)", xaxis_title="", yaxis_range=[0, top * 1.2])
-    return figure_base(fig, height=350, margin=dict(l=45, r=25, t=25, b=80))
+    fig.update_layout(xaxis_title="", yaxis_title="Precisión promedio (AP)", yaxis_range=[0, top * 1.2], bargap=0.34)
+    fig.update_xaxes(gridcolor="rgba(0,0,0,0)", ticks="")
+    return figure_base(fig, height=340)
 
 
-def curve_figure() -> go.Figure:
+def curve_figure(kind: str = "roc") -> go.Figure:
     fig = go.Figure()
-    roc = MODEL["roc_curve"]
-    pr = MODEL["pr_curve"]
-    fig.add_scatter(x=[r["x"] for r in roc], y=[r["y"] for r in roc], mode="lines",
-                    name="ROC", line=dict(color=DENTRO, width=2.5), visible=True)
-    fig.add_scatter(x=[0, 1], y=[0, 1], mode="lines", name="Azar", line=dict(color=REFERENCIA, width=1.5), visible=True)
-    fig.add_scatter(x=[r["x"] for r in pr], y=[r["y"] for r in pr], mode="lines",
-                    name="Precisión–sensibilidad", line=dict(color=DENTRO, width=2.5), visible=False)
-    base = MODEL["metadata"]["test_positive"] / MODEL["metadata"]["test_n"]
-    fig.add_scatter(x=[0, 1], y=[base, base], mode="lines", name="Prevalencia",
-                    line=dict(color=REFERENCIA, width=1.5), visible=False)
-    fig.update_layout(
-        updatemenus=[dict(type="buttons", direction="right", x=0, y=1.16,
-                          buttons=[dict(label="ROC", method="update", args=[{"visible": [True, True, False, False]}, {"xaxis.title": "1 − especificidad", "yaxis.title": "Sensibilidad"}]),
-                                   dict(label="Precisión–sensibilidad", method="update", args=[{"visible": [False, False, True, True]}, {"xaxis.title": "Sensibilidad", "yaxis.title": "Precisión"}])])],
-        xaxis_title="1 − especificidad", yaxis_title="Sensibilidad", xaxis_range=[0, 1], yaxis_range=[0, 1.02],
-    )
-    return figure_base(fig, height=390, margin=dict(l=50, r=30, t=65, b=50))
+    if kind == "roc":
+        roc = MODEL["roc_curve"]
+        fig.add_scatter(x=[0, 1], y=[0, 1], mode="lines", name="Azar", line=dict(color=REFERENCIA, width=1.5, dash="dash"))
+        fig.add_scatter(x=[r["x"] for r in roc], y=[r["y"] for r in roc], mode="lines", name="Modelo", line=dict(color=DENTRO, width=2.5))
+        fig.update_layout(xaxis_title="1 − especificidad", yaxis_title="Sensibilidad")
+    else:
+        pr = MODEL["pr_curve"]
+        base = MODEL["metadata"]["test_positive"] / MODEL["metadata"]["test_n"]
+        fig.add_scatter(x=[0, 1], y=[base, base], mode="lines", name="Prevalencia", line=dict(color=REFERENCIA, width=1.5, dash="dash"))
+        fig.add_scatter(x=[r["x"] for r in pr], y=[r["y"] for r in pr], mode="lines", name="Modelo", line=dict(color=DENTRO, width=2.5))
+        fig.update_layout(xaxis_title="Sensibilidad", yaxis_title="Precisión")
+    fig.update_layout(xaxis_range=[0, 1], yaxis_range=[0, 1.02])
+    return figure_base(fig, height=340, legend=True, margin=dict(l=52, r=18, t=34, b=46))
 
 
 def calibration_figure() -> go.Figure:
     bins = MODEL["calibration"]
     fig = go.Figure()
     fig.add_scatter(x=[0, 0.6], y=[0, 0.6], name="Calibración perfecta", mode="lines",
-                    line=dict(color=REFERENCIA, width=1.5))
+                    line=dict(color=REFERENCIA, width=1.5, dash="dash"))
     fig.add_scatter(x=[r["mean_predicted"] for r in bins], y=[r["observed"] for r in bins],
                     mode="lines+markers", name="Modelo", line=dict(color=DENTRO, width=2.5),
-                    marker=dict(size=9, line=dict(color=HOJA, width=2)), customdata=[[r["n"]] for r in bins],
+                    marker=dict(size=9, line=dict(color=SUELO, width=2)), customdata=[[r["n"]] for r in bins],
                     hovertemplate="Predicho: %{x:.1%}<br>Observado: %{y:.1%}<br>Base: %{customdata[0]:,}<extra></extra>")
-    fig.update_layout(xaxis_title="Probabilidad predicha media", yaxis_title="Proporción observada",
+    fig.update_layout(xaxis_title="Probabilidad estimada", yaxis_title="Proporción observada",
                       xaxis_tickformat=".0%", yaxis_tickformat=".0%", xaxis_range=[0, 0.6], yaxis_range=[0, 0.6])
-    return figure_base(fig, height=380)
+    return figure_base(fig, height=340, legend=True, margin=dict(l=52, r=18, t=34, b=46))
 
 
 def importance_figure() -> go.Figure:
@@ -358,22 +319,10 @@ def importance_figure() -> go.Figure:
     fig = go.Figure(go.Bar(x=[r["mean_ap_drop"] for r in data],
                            y=[FEATURE_NAMES.get(r["feature"], r["feature"]) for r in data],
                            orientation="h", marker_color=[DENTRO if r["feature"] in NUEVAS else BASE for r in data],
-                           hovertemplate="%{y}<br>Caída de AP al permutar: %{x:.3f}<extra></extra>"))
-    fig.update_layout(xaxis_title="Caída media de AP", yaxis_title="")
-    return figure_base(fig, height=355, margin=dict(l=170, r=25, t=15, b=45))
-
-
-def prioritization_table() -> html.Table:
-    rows = MODEL["prioritization"]
-    return html.Table([
-        html.Thead(html.Tr([html.Th(text) for text in
-                            ("Se revisa", "Personas", "De la clase", "Precisión", "Sensibilidad")])),
-        html.Tbody([html.Tr([
-            html.Td(f"{row['fraction'] * 100:.0f} % con mayor puntuación"),
-            html.Td(fmt_int(row["reviewed"])), html.Td(fmt_int(row["positives_found"])),
-            html.Td(fmt_pct(row["precision"])), html.Td(fmt_pct(row["recall"])),
-        ]) for row in rows]),
-    ], className="data-table")
+                           hovertemplate="%{y}<br>Caída de la precisión promedio: %{x:.3f}<extra></extra>"))
+    fig.update_layout(xaxis_title="Caída de la precisión promedio", yaxis_title="", bargap=0.34)
+    fig.update_yaxes(gridcolor="rgba(0,0,0,0)", ticks="")
+    return figure_base(fig, height=340, margin=dict(l=8, r=18, t=6, b=44))
 
 
 def threshold_row(value: float) -> dict:
@@ -390,21 +339,14 @@ def threshold_metrics(row: dict) -> dict:
     }
 
 
-def confusion_figure(row: dict) -> go.Figure:
-    z = [[row["tn"], row["fp"]], [row["fn"], row["tp"]]]
-    fig = go.Figure(go.Heatmap(z=z, x=["Ruta formal", "Fuera de ruta formal"],
-                               y=["Ruta formal", "Fuera de ruta formal"],
-                               text=[[fmt_int(v) for v in line] for line in z], texttemplate="%{text}",
-                               textfont=dict(size=18), colorscale=[[0, "#EEF2FC"], [1, "#7E9FEE"]], showscale=False,
-                               hovertemplate="Real: %{y}<br>Predicho: %{x}<br>%{text} personas<extra></extra>"))
-    fig.update_layout(xaxis_title="Predicción", yaxis_title="Dato censal")
-    fig.update_yaxes(autorange="reversed")
-    return figure_base(fig, height=350, margin=dict(l=138, r=25, t=22, b=70))
-
-
-def acento(texto: str) -> list:
-    """Convierte «a *b* c» en un texto con la palabra de acento marcada."""
-    return [html.Em(parte) if i % 2 else parte for i, parte in enumerate(texto.split("*")) if parte]
+def matriz(row: dict) -> html.Div:
+    celda = lambda valor, etiqueta, clase: html.Div([html.Strong(fmt_int(valor)), html.Span(etiqueta)], className=f"matriz-celda {clase}")
+    eje = lambda texto, clase="": html.Div(texto, className=f"matriz-eje {clase}".strip())
+    return html.Div([
+        html.Div(), eje("El modelo dice: dentro"), eje("El modelo dice: fuera"),
+        eje("En el censo: dentro", "lado"), celda(row["tn"], "Aciertos", "acierto"), celda(row["fp"], "Falsas alarmas", "error"),
+        eje("En el censo: fuera", "lado"), celda(row["fn"], "No detectados", "error"), celda(row["tp"], "Aciertos", "acierto"),
+    ], className="matriz", role="group", **{"aria-label": "Matriz de confusión en la prueba"})
 
 
 def barras_figure(b: dict) -> go.Figure:
@@ -415,10 +357,10 @@ def barras_figure(b: dict) -> go.Figure:
     fig = go.Figure(go.Bar(x=valores, y=b["categorias"][::-1], orientation="h", text=textos, textposition="outside", cliponaxis=False,
                            marker_color={"fuera": FUERA, "dentro": DENTRO}.get(b["color"], TINTA_SUAVE),
                            customdata=detalle, hovertemplate="%{y}<br>%{customdata}<extra></extra>"))
+    fig.update_layout(bargap=0.34)
     fig.update_xaxes(visible=False, range=[0, max(valores) * 1.2])
-    fig.update_yaxes(automargin=True, ticksuffix="  ")
-    fig = figure_base(fig, height=max(170, 58 + 25 * len(valores)), margin=dict(l=8, r=18, t=6, b=6))
-    return fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
+    fig.update_yaxes(gridcolor="rgba(0,0,0,0)", ticks="")
+    return figure_base(fig, height=max(170, 58 + 25 * len(valores)), margin=dict(l=8, r=18, t=6, b=6))
 
 
 def caja(contenido: list, titulo: str | None = None, meta: str | None = None, nota: str | None = None) -> html.Div:
@@ -438,7 +380,8 @@ def tabla(b: dict) -> html.Div:
     clase = lambda j: "izq" if j < b["texto_cols"] else None
     return html.Div(html.Table([
         html.Thead(html.Tr([html.Th(texto, scope="col", className=clase(j)) for j, texto in enumerate(b["columnas"])])),
-        html.Tbody([html.Tr([html.Td(valor, className=clase(j)) for j, valor in enumerate(fila)]) for fila in b["filas"]]),
+        html.Tbody([html.Tr([html.Td(valor, className=clase(j)) for j, valor in enumerate(fila)],
+                            className="destacada" if i == b.get("destacar") else None) for i, fila in enumerate(b["filas"])]),
     ], className="c-tabla"), className="c-tabla-marco")
 
 
@@ -466,22 +409,29 @@ def bloque(b: dict):
         return html.Div([html.Span(b["rotulo"], className="c-rotulo"), html.P(b["texto"])],
                         className=f"c-destacado {b.get('tono', '')}".strip())
     if tipo == "fichas":
-        return html.Div([html.Div([html.Div(item["etiqueta"], className="c-ficha-etiqueta"),
-                                   html.Div(item["valor"], className="c-ficha-valor"),
-                                   html.Div(item["nota"], className="c-ficha-nota")],
-                                  className=f"c-ficha {item.get('tono', '')}".strip()) for item in b["items"]], className="c-fichas")
+        return html.Div([ficha(item["etiqueta"], item["valor"], item["nota"], item.get("tono", "")) for item in b["items"]], className="c-fichas")
     if tipo == "lista":
         items = [html.Div([html.Strong(item["rotulo"]), html.P(item["texto"])], className="c-item") for item in b["items"]]
         return caja([html.Div(items, className="c-lista dos" if b.get("columnas") == 2 else "c-lista")], b["titulo"])
     if tipo == "etapas":
-        return caja([html.Ol([html.Li([html.Strong(item["titulo"]), html.P(item["texto"])]) for item in b["items"]],
-                             className="c-etapas")], b["titulo"])
+        lista = caja([html.Ol([html.Li([html.Strong(item["titulo"]), html.P(item["texto"])]) for item in b["items"]],
+                              className="c-etapas")], b["titulo"])
+        return html.Div(lista, className="c-horizontal") if b.get("horizontal") else lista
     if tipo == "tabla":
         return caja([tabla(b)], b["titulo"], b.get("meta"), b.get("nota"))
     if tipo == "barras":
         return caja([graph(figure=barras_figure(b))], b["titulo"], b["meta"], b["nota"])
     if tipo == "ruta":
-        return caja([action_breakdown()], b["titulo"], None, b["nota"])
+        lista = html.Div([html.Div([
+            html.Div([html.Span(i["nombre"]), html.Strong(i["valor"])], className="ruta-linea"),
+            html.Div(html.Div(className=f"ruta-relleno {i['clase']}", style={"width": f"{i['ancho']}%"}), className="ruta-pista"),
+        ], className="ruta-fila") for i in b["lista"]], className="ruta-lista")
+        return caja([html.Div(className="ruta-diagrama", **{"data-svg": b["svg"]}), lista], b["titulo"], b["meta"], b["nota"])
+    if tipo == "permite":
+        return html.Div([html.Div([html.H3(b["si_titulo"]), html.Ul([html.Li(t) for t in b["si"]])]),
+                         html.Div([html.H3(b["no_titulo"]), html.Ul([html.Li(t) for t in b["no"]])])], className="c-permite")
+    if tipo == "glosario":
+        return caja([html.Dl([html.Div([html.Dt(i["termino"]), html.Dd(i["definicion"])]) for i in b["items"]], className="c-glosario")], b["titulo"])
     if tipo == "columnas":
         return html.Div([bloque(hijo) for hijo in b["bloques"]], className="c-columnas")
     if tipo == "pila":
@@ -490,7 +440,7 @@ def bloque(b: dict):
         return pestanas(b["id"], [p["titulo"] for p in b["pestanas"]],
                         [html.Div([bloque(hijo) for hijo in p["bloques"]], className="c-pila") for p in b["pestanas"]])
     if tipo == "preguntas":
-        return html.Section([html.H2(acento(b["titulo"])),
+        return html.Section([html.H3(b["titulo"]),
                              *[html.Details([html.Summary(item["pregunta"]), html.P(item["respuesta"])], className="pregunta")
                                for item in b["items"]]], className="preguntas")
     if tipo == "referencias":
@@ -505,23 +455,24 @@ def bloque(b: dict):
 
 def layout_contenido(clave: str) -> html.Div:
     pagina = CONTENIDO["paginas"][clave]
-    cabecera = html.Div([html.H1(acento(pagina["titulo"])), html.P(pagina["entrada"], className="c-entrada")],
+    cabecera = html.Div([html.H1(pagina["titulo"]), html.P(pagina["entrada"], className="c-entrada")],
                         className="c-cabecera") if "titulo" in pagina else None
     return html.Div([cabecera, *[bloque(b) for b in pagina["bloques"]]], className="c-pagina")
 
 
 def dropdown(id_: str, label: str, options: list[str], multi: bool = False):
-    return html.Label([
-        html.Span(label, className="filter-label"),
+    return html.Div([
+        html.Span(label, className="filtro-etiqueta"),
         dcc.Dropdown(id=id_, options=[{"label": v, "value": v} for v in options],
                      value=[] if multi else "Todos", multi=multi, clearable=multi,
                      placeholder="Todos los municipios" if multi else None,
-                     labels=DROPDOWN_LABELS, className="filter-control"),
-    ], className="filter")
+                     labels=DROPDOWN_LABELS),
+    ], className="filtro")
 
 
 def selection_sentence(municipios, sexo, edad, zona, dificultad, n, positive, cells, trusted_rate) -> html.Div:
-    """Resume la selección; solo enuncia una tasa cuando las reglas lo permiten."""
+    """Resume la selección; solo enuncia un porcentaje cuando las reglas lo permiten."""
+    explorar = CONTENIDO["explorar"]
     place = "En el Atlántico" if not municipios else f"En {municipios[0]}" if len(municipios) == 1 else f"En {len(municipios)} municipios"
     details = []
     if edad != "Todos":
@@ -533,14 +484,16 @@ def selection_sentence(municipios, sexo, edad, zona, dificultad, n, positive, ce
     who = {"Mujer": "entre mujeres", "Hombre": "entre hombres"}.get(sexo, "entre personas" if details else None)
     group = f", {' '.join([who, *details])}" if who else ""
     if trusted_rate:
-        base = f"Base aproximada: {fmt_int(n)} personas en {cells} {'cruce publicable' if cells == 1 else 'cruces publicables'}"
+        base = f"Base aproximada: {fmt_int(n)} personas en {cells} {'grupo publicado' if cells == 1 else 'grupos publicados'}."
         if len(municipios or []) == 1 and not who:
-            base += ". Se suman solo los cruces publicables, por eso puede diferir de la cifra del mapa."
+            base += " " + explorar["mapa_nota"]
+        elif not municipios and not who:
+            base += " " + explorar["total_nota"]
         return html.Div([html.P([f"{place}{group}, ", html.Strong(f"\u2248 {fmt_pct(positive / n)}"), " quedó fuera de la ruta formal."]),
                          html.Span(base, className="frase-base")], className="frase")
-    note = ("Ningún cruce cumple las reglas de publicación. Prueba a quitar un filtro." if not cells
-            else f"\u2248 {fmt_int(n)} personas en cruces publicables. La protección de grupos pequeños oculta la tasa.")
-    return html.Div([html.P([f"{place}{group}, esta selección ", html.Em("no permite mostrar una tasa"), "."]),
+    note = ("Ningún grupo cumple las reglas de publicación. Prueba a quitar un filtro." if not cells
+            else f"\u2248 {fmt_int(n)} personas en grupos publicados. La protección de grupos pequeños oculta el porcentaje.")
+    return html.Div([html.P([f"{place}{group}, esta selección ", html.Em("no permite mostrar un porcentaje"), "."]),
                      html.Span(note, className="frase-base")], className="frase")
 
 
@@ -549,146 +502,106 @@ def layout_comparar() -> html.Div:
     return html.Div([
         html.P(explorar["comparar_entrada"], className="c-entrada"),
         dcc.RadioItems(id="comp-variable", options=[{"label": v["etiqueta"], "value": v["id"]} for v in explorar["variables"]],
-                       value=explorar["variables"][0]["id"], inline=True, className="segmented"),
+                       value=explorar["variables"][0]["id"], inline=True, className="opciones"),
         html.Div(id="comp-lectura"),
-        caja([graph("comp-chart")], "Fuera de la ruta formal por categoría", "Porcentaje dentro de cada categoría"),
+        caja([graph("comp-chart")], "Porcentaje fuera de la ruta formal", "En cada categoría de la variable elegida"),
         html.P(explorar["comparar_nota"], className="c-pie"),
     ], className="c-pila")
 
 
-def layout_explorar() -> html.Div:
+def layout_grupos() -> html.Div:
     municip = sorted({r["municipio"] for r in EDA["cube"]})
     explorar = CONTENIDO["explorar"]
+    g = explorar["graficas"]
+    omitidos = omitted_municipios_sentence(municip, "en el selector", "ninguno de sus grupos cumple las reglas de publicación")
     return html.Div([
-        html.Div([
-            html.H1(["Elige un grupo y mira qué ", html.Em("cambia"), "."]),
-            html.P("Compara la proporción cuya acción principal quedó fuera de EPS con atención o médico particular. Al filtrar cambian el grupo, su denominador y la cobertura publicable."
-                   + omitted_municipios_sentence(municip, "en el selector", "ninguno de sus cruces cumple las reglas de publicación")),
-        ], className="page-intro"),
-        pestanas("sub-explorar", explorar["pestanas"], [html.Div([
-            html.Aside([
-                html.Div([
-                    dropdown("f-municipio", "Municipio", municip, multi=True),
-                    dropdown("f-sexo", "Sexo reportado", ["Todos", "Hombre", "Mujer"]),
-                    dropdown("f-edad", "Edad", ["Todos"] + AGE_ORDER),
-                    dropdown("f-zona", "Zona", ["Todos", "Cabecera", "Centros poblados y rural disperso"]),
-                    dropdown("f-dificultad", "Dificultad funcional diaria", ["Todos", "Con dificultad funcional", "Sin dificultad funcional"]),
-                ], className="filter-grid"),
-                html.Div(id="coverage-note", className="coverage-note"),
-            ], className="riel", **{"aria-label": "Filtros"}),
+        html.Section([
             html.Div([
-                html.Div(id="frase"),
-                html.Div(id="nota-referencia"),
-                panel("Municipios en la selección", html.Div([
-                    dcc.RadioItems(id="metric-toggle", options=[{"label": "Porcentaje", "value": "tasa"},
-                                                                {"label": "Personas", "value": "conteo"}],
-                                   value="tasa", inline=True, className="segmented"),
-                    graph("municipio-chart"),
-                ]), "COMPARAR TERRITORIOS", RULE_NOTE),
-                html.Div([
-                    panel("Cómo cambia por edad", graph("edad-chart"), "PERFIL POR DIFICULTAD",
-                          "Porcentajes dentro de cada grupo publicado; los cruces omitidos no entran en la línea."),
-                    panel("Sexo y zona de residencia", html.Div([graph("composicion-chart"),
-                                                                html.P(id="composition-note", className="chart-explanation")]), "OTRA MIRADA",
-                          "La comparación es descriptiva; los grupos pueden diferir en edad, municipio y otras condiciones."),
-                ], className="two-col"),
-                html.Div([
-                    html.Button("Descargar selección agregada", id="download-button", className="download-button"),
-                    dcc.Download(id="download-data"),
-                    html.Span("El archivo contiene solo celdas publicables y recuentos redondeados.", className="download-note"),
-                ], className="download-row"),
-                html.P(f"Protección de grupos pequeños: {EDA['metadata']['rules']} El cubo publicado cubre {str(EDA['metadata']['coverage_pct']).replace('.', ',')} % del universo clasificable antes de aplicar filtros.", className="source-line"),
-            ], className="explorar-contenido"),
-        ], className="explorar-marco"), layout_comparar(), html.Div([bloque(b) for b in explorar["ajuste"]], className="c-pila")]),
-    ], className="page")
+                dropdown("f-municipio", "Municipio", municip, multi=True),
+                dropdown("f-sexo", "Sexo", ["Todos", "Hombre", "Mujer"]),
+                dropdown("f-edad", "Edad", ["Todos"] + AGE_ORDER),
+                dropdown("f-zona", "Zona", ["Todos", "Cabecera", "Centros poblados y rural disperso"]),
+                dropdown("f-dificultad", "Dificultad funcional", ["Todos", "Con dificultad funcional", "Sin dificultad funcional"]),
+            ], className="seleccion-filtros"),
+            html.Div([html.P(explorar["ayuda"], className="seleccion-ayuda"),
+                      html.Button("Quitar filtros", id="limpiar", className="boton discreto", n_clicks=0)], className="seleccion-pie"),
+            html.Div([html.Div(id="frase"), html.Div(id="coverage-note")], className="seleccion-resultado"),
+        ], className="seleccion", **{"aria-label": "Filtros y resultado"}),
+        html.Div(id="nota-referencia"),
+        html.Div([
+            caja([dcc.RadioItems(id="metric-toggle", options=[{"label": "Porcentaje", "value": "tasa"}, {"label": "Personas", "value": "conteo"}],
+                                 value="tasa", inline=True, className="opciones"), graph("municipio-chart")],
+                 g["municipios"]["titulo"], g["municipios"]["meta"]),
+            html.Div([
+                caja([graph("edad-chart")], g["edad"]["titulo"], g["edad"]["meta"], g["edad"]["nota"]),
+                caja([graph("composicion-chart"), html.P(id="composition-note", className="c-nota")], g["composicion"]["titulo"], g["composicion"]["meta"]),
+            ], className="lecturas-lado"),
+        ], className="lecturas"),
+        html.Details([html.Summary(explorar["por_que_titulo"]), html.Ul([html.Li(t) for t in explorar["por_que"]]),
+                      html.P(omitidos.strip(), className="c-nota") if omitidos else None], className="por-que-faltan"),
+        html.Div([
+            html.Button("Descargar selección agregada", id="download-button", className="boton secundario"),
+            dcc.Download(id="download-data"),
+            html.Span(explorar["descarga_nota"], className="descarga-nota"),
+        ], className="descarga"),
+    ], className="c-pila")
+
+
+def layout_explorar() -> html.Div:
+    explorar = CONTENIDO["explorar"]
+    return html.Div([
+        html.Div([html.H1(explorar["titulo"]), html.P(explorar["entrada"], className="c-entrada")], className="c-cabecera"),
+        pestanas("sub-explorar", explorar["pestanas"], [layout_grupos(), layout_comparar(), html.Div([bloque(b) for b in explorar["ajuste"]], className="c-pila")]),
+    ], className="pagina")
 
 
 def layout_modelo() -> html.Div:
+    m = CONTENIDO["modelo"]
+    g = m["graficas"]
+    lab = m["laboratorio"]
+    cambio = m["cambio"]
     chosen = MODEL["metadata"]["chosen_threshold"]
-    audit = MODEL["audit_2026"]
-    change = MODEL["version_change"]
-    equity = MODEL["equity"]
-    uncertainty = MODEL["uncertainty"]["intervals_95"]
-    ap_text = lambda value: f"{value:.3f}".replace(".", ",")
-    baseline_ap = MODEL["models"]["baseline"]["test"]["pr_auc"]
     # La marca numérica pegada al umbral validado pierde su texto para no superponerse.
     marks = {i / 20: (f"{i / 20:.2f}".replace(".", ",") if i % 2 == 0 and abs(i / 20 - chosen) >= 0.03 else "")
              for i in range(1, 17)}
-    marks[chosen] = {"label": "Validado", "style": {"color": DENTRO, "fontWeight": 600}}
+    marks[chosen] = {"label": "Validado", "style": {"color": DENTRO, "fontWeight": 700}}
     return html.Div([
-        html.Div([
-            html.H1(["Un modelo para ordenar perfiles, ", html.Em("con límites claros"), "."]),
-            html.P("Comparamos cuatro enfoques. El mejor entre los probados fue boosting de histogramas. Sus resultados corresponden a viviendas reservadas del mismo censo de 2018."),
-        ], className="page-intro"),
-        html.Div([
-            card("Average Precision", f"{SOURCE['pr_auc']:.3f}".replace(".", ","),
-                 "Referencia por prevalencia: " + f"{baseline_ap:.3f}".replace(".", ",") + " · prueba interna"),
-            card("ROC-AUC", f"{SOURCE['roc_auc']:.3f}".replace(".", ","), "Capacidad de ordenar casos · prueba interna", "navy"),
-            card("Brier", f"{SOURCE['brier']:.3f}".replace(".", ","), "Menor es mejor · prueba interna", "coral"),
-        ], className="kpi-grid model-metrics"),
+        html.Div([html.H1(m["titulo"]), html.P(m["entrada"], className="c-entrada")], className="c-cabecera"),
+        bloque(m["fichas"]),
         html.Section([
-            html.Div([
-                html.H2(["Qué ", html.Em("cambió"), " en esta versión"]),
-                html.P(f"Las {audit['alternatives']} alternativas de preparación de datos y ajuste probadas antes no mejoraron el modelo de 26 variables. "
-                       "La mejora llegó con dos variables de contexto: cuántas personas más del hogar declararon un problema de salud y qué proporción lo declaró en la sección censal. "
-                       f"El AP de validación pasó de {ap_text(change['previous_validation_ap'])} a {ap_text(change['new_validation_ap'])}, y en secciones no vistas al ajustar, "
-                       f"de {ap_text(change['previous_unseen_sections_ap'])} a {ap_text(change['new_unseen_sections_ap'])}."),
-                html.P("No revelan la acción de la persona, pero se miden en el mismo censo. Pueden reflejar problemas más leves o la forma de responder; no indican una causa."),
-            ]),
-            html.Div([
-                html.Strong("Una diferencia que merece atención"),
-                html.P(f"Con el umbral elegido, la sensibilidad fue {fmt_pct(equity['recall_difficulty'])} entre quienes declararon dificultad funcional y {fmt_pct(equity['recall_no_difficulty'])} entre quienes no la declararon. "
-                       f"Al ajustar descriptivamente por edad, las cifras son {fmt_pct(equity['age_adjusted_recall_difficulty'])} y {fmt_pct(equity['age_adjusted_recall_no_difficulty'])}. "
-                       f"Entre personas de 60 años o más fue {fmt_pct(equity['recall_60_plus'])}."),
-                html.A("Ver la revisión completa en el Bookdown", href="/informe/modelo.html#modelo-contexto-2026", target="_blank", rel="noopener noreferrer"),
-            ]),
-        ], className="audit-strip"),
-        html.Div([
-            panel("Comparación en prueba", graph(figure=comparison_figure()), "MÉTRICA PRINCIPAL",
-                  "Average Precision resume el ordenamiento de la clase minoritaria. Es AP no interpolada; no es el área trapezoidal de la curva PR."),
-            panel("Curvas de discriminación", graph(figure=curve_figure()), "ROC Y PRECISIÓN–SENSIBILIDAD",
-                  "Curvas visuales resumidas; las cifras de AP y ROC-AUC provienen de todas las puntuaciones de prueba."),
-        ], className="two-col"),
+            html.Div([html.H2(cambio["titulo"]), *[html.P(t) for t in cambio["parrafos"]],
+                      html.A("Ver la revisión completa en el informe", href="/informe/modelo.html#modelo-contexto-2026", target="_blank", rel="noopener noreferrer")]),
+            html.Div([html.H3(cambio["aviso_titulo"]), *[html.P(t) for t in cambio["aviso"]]]),
+        ], className="cambio"),
         html.Div([
             html.Div([
-                html.H3("¿Qué cambia al marcar a más personas?"),
-                html.P("Mueve el umbral para comparar alcance y falsos avisos en la prueba de 2018. El punto ‘Validado’ se eligió con el conjunto de validación; los demás son escenarios exploratorios."),
+                html.H2(lab["titulo"]), html.P(lab["texto"]),
+                html.Span(lab["etiqueta"], className="c-rotulo"),
                 dcc.Slider(id="threshold", min=0.05, max=0.8, step=None, marks=marks, value=chosen,
                            tooltip={"placement": "bottom", "always_visible": False}),
-                html.Div(id="threshold-title", className="threshold-title"),
-                html.Div(id="threshold-kpis", className="threshold-grid"),
-            ], className="threshold-controls"),
-            panel("Aciertos y errores", graph("confusion-chart"), "MATRIZ DE CONFUSIÓN",
-                  "La clase positiva es la acción principal fuera de la ruta formal. Las cifras son del conjunto de prueba reservado."),
-        ], className="two-col"),
-        panel("¿Y si solo se revisara una parte?", prioritization_table(), "PRIORIZACIÓN EXPLORATORIA",
-              f"Ordena las {fmt_int(MODEL['metadata']['test_n'])} personas de la prueba de 2018 por puntuación. No es una recomendación: no hay costos ni capacidad definidos, y el modelo no debe usarse para decidir sobre personas."),
+                html.Div(id="threshold-title"),
+                html.Div(id="threshold-kpis", className="c-fichas"),
+            ]),
+            html.Div([html.H3(lab["matriz_titulo"]), html.Div(id="confusion"), html.P(lab["matriz_nota"], className="c-nota")]),
+        ], className="laboratorio"),
         html.Div([
-            panel("Probabilidad y frecuencia observada", graph(figure=calibration_figure()), "CALIBRACIÓN",
-                  "Cada punto agrupa aproximadamente una décima parte de la prueba. La cercanía a la diagonal no valida el modelo para otro año."),
-            panel("Variables que más contribuyeron al ordenamiento", graph(figure=importance_figure()), "IMPORTANCIA POR PERMUTACIÓN",
-                  "En azul, las dos variables añadidas. La caída de AP mide dependencia predictiva; no representa efecto causal ni justifica una decisión individual."),
-        ], className="two-col"),
+            caja([graph(figure=comparison_figure())], g["comparacion"]["titulo"], g["comparacion"]["meta"], g["comparacion"]["nota"]),
+            caja([dcc.RadioItems(id="curva", options=[{"label": "ROC", "value": "roc"}, {"label": "Precisión y sensibilidad", "value": "pr"}],
+                                 value="roc", inline=True, className="opciones"), graph("curve-chart")],
+                 g["curvas"]["titulo"], g["curvas"]["meta"], g["curvas"]["nota"]),
+        ], className="c-columnas"),
         html.Div([
-            html.H3("Cómo leer este modelo"),
-            html.Div([
-                html.Div([html.H4("Separación cuidadosa"), html.P("Entrenamiento, validación y prueba se separaron por vivienda. Preprocesamiento y ajustes se hicieron dentro de entrenamiento; el umbral se eligió en validación.")]),
-                html.Div([html.H4("Una mejora acotada"), html.P(
-                    "El AP del modelo fue " + f"{SOURCE['pr_auc']:.3f}".replace(".", ",") + "; su intervalo interno de 95 % fue "
-                    f"{uncertainty['selected_ap'][0]:.3f}".replace(".", ",") + "–" +
-                    f"{uncertainty['selected_ap'][1]:.3f}".replace(".", ",") +
-                    ". La discriminación es moderada.")]),
-                html.Div([html.H4("Uso responsable"), html.P("Los datos son transversales de 2018. Falta validación temporal y geográfica antes de aplicarlo a personas actuales o decisiones de atención.")]),
-            ], className="method-grid"),
-            html.P("La clase modelada depende de una sola acción principal reportada. No mide afiliación, necesidad clínica, barreras causales ni ausencia de toda atención. ‘Dificultad funcional’ no equivale a diagnóstico de discapacidad.", className="method-warning"),
-        ], className="method-panel"),
-    ], className="page")
+            caja([graph(figure=calibration_figure())], g["calibracion"]["titulo"], g["calibracion"]["meta"], g["calibracion"]["nota"]),
+            caja([graph(figure=importance_figure())], g["importancia"]["titulo"], g["importancia"]["meta"], g["importancia"]["nota"]),
+        ], className="c-columnas"),
+        *[bloque(b) for b in m["despues"]],
+    ], className="pagina")
 
 
 app = Dash(__name__, title=NOMBRE, suppress_callback_exceptions=True)
 app.index_string = app.index_string.replace(
     "{%css%}",
-    '<link rel="preload" href="/assets/fonts/plus-jakarta-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>{%css%}',
+    '<link rel="preload" href="/assets/fonts/atkinson-next-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>{%css%}',
 )
 server = app.server
 
@@ -719,7 +632,7 @@ def layout_pagina(clave: str) -> html.Div:
 
 app.layout = html.Div([
     html.Header([
-        html.Div([html.Span(className="brand-dot"), html.Span(NOMBRE, className="brand-main")], className="brand"),
+        html.Div([html.Span(className="marca-punto"), NOMBRE], className="marca"),
         dcc.Tabs(id="nav", value=SECCIONES[0], className="nav-tabs", children=[
             dcc.Tab(label=seccion["etiqueta"], value=seccion["id"], className="nav-tab", selected_className="nav-tab-active")
             for seccion in CONTENIDO["secciones"]]),
@@ -727,12 +640,11 @@ app.layout = html.Div([
     html.Main([html.Div(layout_pagina(clave), id=f"page-{clave}", style={"display": "block" if clave == SECCIONES[0] else "none"})
                for clave in SECCIONES]),
     html.Footer([
-        html.Span(f"{NOMBRE} · CNPV 2018"),
-        html.Span([html.A("Informe completo", href="/informe/", target="_blank", rel="noopener noreferrer"), " · ",
-                   html.A("Aplicación Shiny", href="https://shiny-salud-atlantico-409319239507.us-east1.run.app/", target="_blank", rel="noopener noreferrer"), " · ",
-                   html.A("Microdatos CNPV 2018 · DANE", href="https://microdatos.dane.gov.co/catalog/643",
-                          target="_blank", rel="noopener noreferrer"), " · Cifras históricas"]),
-    ], className="site-footer"),
+        html.Span([f"{NOMBRE}. Datos del censo de 2018. ", html.A("Informe completo", href="/informe/", target="_blank", rel="noopener noreferrer"), ". ",
+                   html.A("Aplicación Shiny", href="https://shiny-salud-atlantico-409319239507.us-east1.run.app/", target="_blank", rel="noopener noreferrer"), ". ",
+                   html.A("Microdatos del DANE", href="https://microdatos.dane.gov.co/catalog/643", target="_blank", rel="noopener noreferrer"), "."]),
+    ], className="pie-sitio"),
+    dcc.Store(id="filtros-activos"),
 ], className="app-shell")
 
 
@@ -767,31 +679,34 @@ def update_explore(municipios, sexo, edad, zona, dificultad, metric):
     trusted_rate = safe_to_rate(n, coverage_pct)
     reference = None if trusted_rate else reference_aggregate(municipios, sexo, edad, zona, dificultad)
     sentence = selection_sentence(municipios, sexo, edad, zona, dificultad, n, positive, len(rows), trusted_rate)
-    coverage_text = "sin estimación publicable" if coverage_pct is None else f"al menos {coverage_pct} %"
-    interpretation = (
-        "La tasa mostrada describe los cruces publicados y puede diferir de la tasa de toda la subpoblación."
-        if trusted_rate else
-        "La tasa se oculta porque esta selección no tiene cobertura o tamaño suficientes para interpretarla."
-    )
     state = "sin-datos" if not rows else ("visible" if trusted_rate else "oculta")
-    state_label = {"visible": "\u2713 Tasa visible", "oculta": "\u2298 Tasa oculta", "sin-datos": "\u2298 Sin cruces publicables"}[state]
-    coverage_label = f"Cobertura: {coverage_text}" + (" (límite conservador por municipio)" if municipios and len(municipios) > 1 else "")
+    state_label = {"visible": "Porcentaje visible", "oculta": "Porcentaje oculto", "sin-datos": "Sin grupos publicados"}[state]
+    if not rows:
+        motive = "Ninguno de sus grupos cumple las reglas de publicación."
+    elif trusted_rate:
+        motive = "Tiene personas suficientes y buena cobertura."
+    elif coverage_pct is None or coverage_pct < 80:
+        motive = "Los grupos publicados cubren menos del 80 % de esta selección."
+    else:
+        motive = "La base aproximada es menor de 200 personas."
+    coverage_label = ("Cobertura sin estimación publicable" if coverage_pct is None else f"Cobertura: al menos {coverage_pct} %") \
+        + (" (se usa el municipio con menor valor)" if municipios and len(municipios) > 1 else "")
     coverage = [html.Div([
-        html.Div([html.Strong(state_label), html.Span(f"{len(rows)} {'cruce publicable' if len(rows) == 1 else 'cruces publicables'} en esta selección. {interpretation}")], className="cinta-texto"),
+        html.Div([html.Strong(state_label), html.Span(motive)], className="cinta-texto"),
         html.Div([
             html.Div(coverage_label, className="cinta-rotulo"),
             html.Div([html.Div(className="cinta-relleno", style={"width": f"{coverage_pct or 0}%"}),
-                      html.Div(className="cinta-umbral", title="Umbral de 80 %")],
-                     className="cinta-pista", role="img", **{"aria-label": f"{coverage_label}; umbral de publicación 80 %"}),
-        ], className="cinta-medida"),
+                      html.Div(className="cinta-umbral", title="Mínimo de 80 %")],
+                     className="cinta-pista", role="img", **{"aria-label": f"{coverage_label}; mínimo para publicar 80 %"}),
+        ]),
     ], className=f"cinta {state}")]
     note = None
     if reference:
         label, ref, source = reference
         note = html.P(
-            f"Referencia sin cruces adicionales: «{label}» registra ≈ {fmt_pct(ref['sin_formal'] / ref['n'])} sobre una base aproximada de "
-            f"{fmt_int(ref['n'])} personas en {source}. Ese agregado se publica aparte, con conteos redondeados a 10, y no procede de las celdas filtrables.",
-            className="coverage-reference")
+            f"Como referencia, «{label}» registra ≈ {fmt_pct(ref['sin_formal'] / ref['n'])} sobre una base aproximada de "
+            f"{fmt_int(ref['n'])} personas en {source}. Esa cifra se publica aparte, con recuentos redondeados a 10, y no sale de los grupos filtrables.",
+            className="referencia")
     ranked = ranked_figure(rows, metric, sexo, edad, zona, dificultad)
     ranked_style = {"height": f"{int(ranked.layout.height)}px", "width": "100%"}
     composition, composition_note = composition_figure(rows, municipios, sexo, edad, zona, dificultad)
@@ -815,19 +730,103 @@ def update_comparar(clave):
     return lectura, figura, {"height": f"{int(figura.layout.height)}px", "width": "100%"}
 
 
+@app.callback(Output("f-municipio", "value"), Output("f-sexo", "value"), Output("f-edad", "value"),
+              Output("f-zona", "value"), Output("f-dificultad", "value"), Input("limpiar", "n_clicks"), prevent_initial_call=True)
+def clear_filters(_clicks):
+    return [], "Todos", "Todos", "Todos", "Todos"
+
+
+@app.callback(Output("curve-chart", "figure"), Input("curva", "value"))
+def update_curve(kind):
+    return curve_figure(kind)
+
+
 @app.callback(Output("threshold-title", "children"), Output("threshold-kpis", "children"),
-              Output("confusion-chart", "figure"), Input("threshold", "value"))
+              Output("confusion", "children"), Input("threshold", "value"))
 def update_threshold(value):
     row = threshold_row(float(value))
     met = threshold_metrics(row)
-    label = "Umbral validado" if abs(row["threshold"] - MODEL["metadata"]["chosen_threshold"]) < 1e-8 else "Escenario exploratorio"
-    title = f"{label}: {row['threshold']:.3f}".replace(".", ",")
+    validated = abs(row["threshold"] - MODEL["metadata"]["chosen_threshold"]) < 1e-8
+    label = "Umbral validado" if validated else "Escenario de exploración"
+    title = html.Div(f"{label}: {row['threshold']:.3f}".replace(".", ","), className="umbral-titulo validado" if validated else "umbral-titulo")
     values = [
-        card("Sensibilidad", fmt_pct(met["recall"]), "De los casos de la clase, cuántos marca"),
-        card("Precisión", fmt_pct(met["precision"]), "De los marcados, cuántos pertenecen a la clase", "coral"),
-        card("Personas marcadas", fmt_int(met["flagged"]), f"De {fmt_int(MODEL['metadata']['test_n'])} en prueba", "navy"),
+        ficha("Sensibilidad", fmt_pct(met["recall"]), "De quienes están fuera de la ruta, cuántos marca"),
+        ficha("Precisión", fmt_pct(met["precision"]), "De los marcados, cuántos están fuera de la ruta"),
+        ficha("Personas marcadas", fmt_int(met["flagged"]), f"De {fmt_int(MODEL['metadata']['test_n'])} en la prueba"),
     ]
-    return title, values, confusion_figure(row)
+    return title, values, matriz(row)
+
+
+# El asistente lee aquí la selección; las cifras las recalcula el servidor.
+app.clientside_callback(
+    "function (m, s, e, z, d) { window.__filtrosActivos = { municipios: m || [], sexo: s, edad: e, zona: z, dificultad: d }; return true; }",
+    Output("filtros-activos", "data"), Input("f-municipio", "value"), Input("f-sexo", "value"), Input("f-edad", "value"),
+    Input("f-zona", "value"), Input("f-dificultad", "value"))
+
+
+def texto_de(componente) -> str:
+    if isinstance(componente, (list, tuple)):
+        return "".join(texto_de(c) for c in componente)
+    if hasattr(componente, "children"):
+        return texto_de(componente.children)
+    return "" if componente is None else str(componente)
+
+
+def resumen_asistente(filtros: dict) -> dict:
+    """Resultado de la selección con las mismas funciones y reglas de la vista de grupos."""
+    permitidos = {"sexo": ("Hombre", "Mujer"), "edad": tuple(AGE_ORDER), "zona": ("Cabecera", "Centros poblados y rural disperso"),
+                  "dificultad": ("Con dificultad funcional", "Sin dificultad funcional")}
+    limpios = {k: (filtros.get(k) if filtros.get(k) in v else "Todos") for k, v in permitidos.items()}
+    municipios = [m for m in (filtros.get("municipios") or []) if m in ATLANTICO_MUNICIPIOS]
+    activo = bool(municipios) or any(v != "Todos" for v in limpios.values())
+    rows = filter_cube(municipios, limpios["sexo"], limpios["edad"], limpios["zona"], limpios["dificultad"])
+    n, positive = sum(r["n"] for r in rows), sum(r["sin_formal"] for r in rows)
+    coverage = coverage_for(municipios, limpios["sexo"], limpios["edad"], limpios["zona"], limpios["dificultad"])
+    trusted = safe_to_rate(n, coverage)
+    frase = selection_sentence(municipios, limpios["sexo"], limpios["edad"], limpios["zona"], limpios["dificultad"], n, positive, len(rows), trusted)
+    partes = frase.children
+    texto = f"{texto_de(partes[0])} {texto_de(partes[1])}"
+    return {"activo": activo, "visible": trusted, "texto": texto}
+
+
+def consulta_municipio(municipio: str) -> str:
+    fila = next((r for r in EDA["municipal_overview"] if r["municipio"] == municipio), None)
+    if fila is None:
+        return f"El porcentaje de {municipio} no se publica porque no alcanza el mínimo de 100 personas y 10 dentro y fuera de la ruta formal."
+    return (f"En {municipio}, ≈ {fmt_pct(fila['sin_formal'] / fila['n'])} de las personas estudiadas quedó fuera de la ruta formal, "
+            f"sobre una base aproximada de {fmt_int(fila['n'])} personas. Es una respuesta del censo de 2018, no indica atención negada ni explica la causa.")
+
+
+asistente = Asistente(resumen_asistente, consulta_municipio, list(ATLANTICO_MUNICIPIOS))
+ORIGENES = set(filter(None, os.environ.get("ASISTENTE_ORIGENES", "http://localhost:8060,http://127.0.0.1:8060,https://shiny-salud-atlantico-409319239507.us-east1.run.app").split(",")))
+
+
+def con_cors(respuesta):
+    origen = request.headers.get("Origin")
+    if origen in ORIGENES:
+        respuesta.headers["Access-Control-Allow-Origin"] = origen
+        respuesta.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        respuesta.headers["Vary"] = "Origin"
+    return respuesta
+
+
+@server.get("/api/asistente/estado")
+def asistente_estado():
+    return con_cors(jsonify(modo=asistente.modo()))
+
+
+@server.route("/api/asistente", methods=["POST", "OPTIONS"])
+def asistente_preguntar():
+    if request.method == "OPTIONS":
+        return con_cors(app.server.response_class(status=204))
+    datos = request.get_json(silent=True) or {}
+    pregunta = str(datos.get("pregunta") or "").strip()
+    if not pregunta or len(pregunta) > LARGO_MAXIMO:
+        return con_cors(jsonify(error=f"Escribe una pregunta de hasta {LARGO_MAXIMO} caracteres.")), 400
+    if not asistente.limite.permitir(request.headers.get("X-Forwarded-For", request.remote_addr or "local").split(",")[0]):
+        return con_cors(jsonify(error="Se alcanzó el límite de preguntas. Intenta de nuevo en unos minutos.")), 429
+    filtros = datos.get("filtros") if isinstance(datos.get("filtros"), dict) else {}
+    return con_cors(jsonify(asistente.responder(pregunta, filtros)))
 
 
 @app.callback(Output("download-data", "data"), Input("download-button", "n_clicks"),
@@ -843,5 +842,4 @@ def download_selection(_clicks, municipios, sexo, edad, zona, dificultad):
 
 
 if __name__ == "__main__":
-    import os
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8050")), debug=False)
