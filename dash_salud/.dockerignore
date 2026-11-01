@@ -6,6 +6,7 @@ __pycache__/
 *.ipynb
 *.zip
 generar_datos.py
+generar_relato.py
 pruebas.py
 deploy_cloud_run.ps1
 deploy_cloud_shell.sh

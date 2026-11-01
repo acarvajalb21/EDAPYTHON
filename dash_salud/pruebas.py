@@ -11,6 +11,12 @@ from dash_salud.app import (
 )
 
 
+def client_assets_ok() -> bool:
+    client = app.server.test_client()
+    return all(client.get(f"/assets/{name}").status_code == 200 for name in
+               ("relato.js", "relato.css", "relato_datos.json", "fonts/fraunces-latin-wght-normal.woff2"))
+
+
 def run() -> None:
     meta = EDA["metadata"]
     assert meta["population_flow"] == {
@@ -45,23 +51,24 @@ def run() -> None:
     assert "toda la cohorte" in note
     _, filtered_note = composition_figure(all_rows, ["Baranoa"], "Todos", "Todos", "Todos", "Todos")
     assert "cruces publicables" in filtered_note
-    assert update_explore([], "Todos", "Todos", "Todos", "Todos", "tasa")[2] is not None
-    assert update_explore(["Piojó"], "Todos", "Todos", "Todos", "Todos", "tasa")[2] is not None
+    assert update_explore([], "Todos", "Todos", "Todos", "Todos", "tasa")[3] is not None
+    assert update_explore(["Piojó"], "Todos", "Todos", "Todos", "Todos", "tasa")[3] is not None
     assert len(ATLANTICO_MUNICIPIOS) == 23
     assert {row["municipio"] for row in EDA["cube"] + EDA["municipal_overview"]} <= set(ATLANTICO_MUNICIPIOS)
     # Sin celdas publicables no se muestra «≈ 0» como si no hubiera personas.
     empty = update_explore([], "Mujer", "0–19", "Centros poblados y rural disperso", "Con dificultad funcional", "tasa")
-    assert empty[0][0].children[1].children == "Sin cruces publicables"
+    assert "sin-datos" in empty[1][0].className and "Ningún cruce" in empty[0].children[1].children
     # Una tasa oculta remite al agregado publicado aparte, con su propio denominador.
     usiacuri = next(row for row in EDA["municipal_overview"] if row["municipio"] == "Usiacurí")
     hidden = update_explore(["Usiacurí"], "Todos", "Todos", "Todos", "Todos", "tasa")
-    assert hidden[0][1].children[1].children == "Cobertura insuficiente"
-    assert fmt_int(usiacuri["n"]) in hidden[1][-1].children
-    assert fmt_pct(usiacuri["sin_formal"] / usiacuri["n"]) in hidden[1][-1].children
+    assert "oculta" in hidden[1][0].className and "no permite mostrar una tasa" in str(hidden[0].children[0])
+    assert fmt_int(usiacuri["n"]) in hidden[2].children
+    assert fmt_pct(usiacuri["sin_formal"] / usiacuri["n"]) in hidden[2].children
     rural = [row for row in EDA["zone_sex_summary"] if row["zona"] == "Centros poblados y rural disperso"]
-    rural_note = update_explore([], "Todos", "Todos", "Centros poblados y rural disperso", "Todos", "tasa")[1]
-    assert fmt_int(sum(row["n"] for row in rural)) in rural_note[-1].children
-    assert len(update_explore([], "Todos", "Todos", "Todos", "Todos", "tasa")[1]) == 1
+    rural_note = update_explore([], "Todos", "Todos", "Centros poblados y rural disperso", "Todos", "tasa")[2]
+    assert fmt_int(sum(row["n"] for row in rural)) in rural_note.children
+    general = update_explore([], "Todos", "Todos", "Todos", "Todos", "tasa")
+    assert general[2] is None and "21,5" in str(general[0].children[0])
     assert reference_aggregate(["Usiacurí"], "Hombre", "Todos", "Todos", "Todos") is None
     assert reference_aggregate([], "Todos", "65+", "Todos", "Todos") is None
     assert "<br>" in empty_figure("Cobertura o tamaño insuficiente para comparar municipios").layout.annotations[0].text
@@ -95,11 +102,12 @@ def run() -> None:
     nav = next(item for item in components if getattr(item, "id", None) == "nav")
     assert [tab.label for tab in nav.children] == ["Proyecto", "EDA", "Modelo y método"]
     text = " ".join(item.children for item in components if isinstance(getattr(item, "children", None), str))
-    for phrase in ("¿Qué ruta de atención se declaró", "Entender cómo varía la ruta declarada de atención",
-                   "Tres objetivos concretos", "¿A quién representan estas cifras?", "Explora los datos",
+    for phrase in ("Entender cómo varía la ruta declarada de atención",
+                   "Tres objetivos concretos", "¿A quién representan estas cifras?",
                    "Piojó no aparece en el selector", "Piojó no aparece en esta vista"):
         assert phrase in text
-    assert any(getattr(item, "id", None) == "go-eda" for item in components)
+    assert any(getattr(item, "id", None) == "relato" for item in components)
+    assert client_assets_ok()
     slider = next(item for item in components if getattr(item, "id", None) == "threshold")
     assert all(not label for value, label in slider.marks.items() if value != threshold and abs(value - threshold) < 0.03)
     municipio_filter = next(item for item in components if getattr(item, "id", None) == "f-municipio")
@@ -110,8 +118,8 @@ def run() -> None:
     assert all(item.style["width"] == "100%" for item in graphs)
     assert all("IBM Plex Sans" in item.figure.layout.font.family for item in graphs if item.figure is not None)
     dynamic = update_explore([], "Todos", "Todos", "Todos", "Todos", "tasa")
-    assert dynamic[3]["height"] == f"{int(dynamic[2].layout.height)}px"
-    assert "IBM Plex Sans" in dynamic[2].layout.font.family
+    assert dynamic[4]["height"] == f"{int(dynamic[3].layout.height)}px"
+    assert "IBM Plex Sans" in dynamic[3].layout.font.family
 
     client = app.server.test_client()
     assert client.get("/").status_code == 200
