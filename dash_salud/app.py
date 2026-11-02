@@ -29,17 +29,17 @@ NOMBRE = CONTENIDO["nombre"]
 SECCIONES = [seccion["id"] for seccion in CONTENIDO["secciones"]]
 
 # Tokens de color (ver DISENO.md). FUERA y DENTRO significan siempre lo mismo.
-TINTA = "#14233A"
-TINTA_MEDIA = "#3B4A60"
-TINTA_SUAVE = "#556378"
-HILO = "rgba(20, 35, 58, .13)"
-SUELO = "#E9EDF2"
-DENTRO = "#2454D6"
-FUERA = "#D93F4C"
-GRUPO_A = "#00908A"
+TINTA = "#10293B"
+TINTA_MEDIA = "#3A4F60"
+TINTA_SUAVE = "#54697A"
+HILO = "rgba(16, 41, 59, .13)"
+SUELO = "#EEF2F5"
+DENTRO = "#1B6CA8"
+FUERA = "#DD6B20"
+GRUPO_A = "#5B6FB5"
 GRUPO_B = "#A86C00"
-REFERENCIA = "#7C8799"
-BASE = "#A9B4C2"
+REFERENCIA = "#7D8A96"
+BASE = "#A9B6C1"
 FUENTE = "Atkinson Hyperlegible Next, Segoe UI, Arial, sans-serif"
 AGE_ORDER = EDA["metadata"]["age_bands"]
 MODEL_NAMES = {
@@ -797,7 +797,7 @@ def consulta_municipio(municipio: str) -> str:
             f"sobre una base aproximada de {fmt_int(fila['n'])} personas. Es una respuesta del censo de 2018, no indica atención negada ni explica la causa.")
 
 
-asistente = Asistente(resumen_asistente, consulta_municipio, list(ATLANTICO_MUNICIPIOS))
+asistente = Asistente(resumen_asistente, consulta_municipio, list(ATLANTICO_MUNICIPIOS), CONTENIDO["explorar"]["variables"])
 ORIGENES = set(filter(None, os.environ.get("ASISTENTE_ORIGENES", "http://localhost:8060,http://127.0.0.1:8060,https://shiny-salud-atlantico-409319239507.us-east1.run.app").split(",")))
 
 
@@ -826,7 +826,7 @@ def asistente_preguntar():
     if not asistente.limite.permitir(request.headers.get("X-Forwarded-For", request.remote_addr or "local").split(",")[0]):
         return con_cors(jsonify(error="Se alcanzó el límite de preguntas. Intenta de nuevo en unos minutos.")), 429
     filtros = datos.get("filtros") if isinstance(datos.get("filtros"), dict) else {}
-    return con_cors(jsonify(asistente.responder(pregunta, filtros)))
+    return con_cors(jsonify(asistente.responder(pregunta, filtros, datos.get("historial"))))
 
 
 @app.callback(Output("download-data", "data"), Input("download-button", "n_clicks"),

@@ -1,15 +1,15 @@
-# Asistente del proyecto
+# BQSI, el asistente del proyecto
 
-Responde preguntas sobre los datos, los indicadores, la metodología, los resultados y los límites del análisis. Vive en el servidor del Dash (`/api/asistente`) y Shiny usa el mismo servicio, con el mismo widget (`assets/asistente.js`).
+BQSI responde preguntas sobre los datos, los indicadores, la metodología, los resultados y los límites del análisis. Vive en el servidor del Dash (`/api/asistente`) y Shiny usa el mismo servicio, con el mismo widget (`assets/asistente.js`): una pestaña de chat abajo a la derecha que se despliega hacia arriba. El nombre se cambia en `NOMBRE` de ese archivo y en `asistente.py`.
 
 ## Fuentes
 
-`data/conocimiento.json` reúne 188 pasajes, generados con `python -m dash_salud.generar_conocimiento`:
+`data/conocimiento.json` reúne 229 pasajes, generados con `python -m dash_salud.generar_conocimiento`:
 
 - Textos y tablas agregadas de `contenido.json`.
 - Métricas del modelo validado en `modelo.json`.
 - Prosa del informe en `informe/`. Sus tablas se omiten porque no siempre pasan por el redondeo de las aplicaciones.
-- Respuestas de referencia a las preguntas más comunes, con cifras leídas de esos mismos archivos.
+- 47 respuestas de referencia a las preguntas más comunes, con cifras leídas de esos mismos archivos.
 
 Si cambia el informe o el contenido, hay que regenerarlo.
 
@@ -22,12 +22,16 @@ Si cambia el informe o el contenido, hay que regenerarlo.
 
 Si la llamada falla, llega al tope diario o la redacción trae una cifra que no está en las fuentes, se descarta y se vuelve al modo de demostración con un aviso.
 
+En ambos modos, las preguntas por municipios, grupos y órdenes se contestan con los agregados publicados, sin pasar por un modelo. El widget conserva la conversación mientras la página sigue abierta y envía al servidor hasta cuatro turnos recientes. En modo conectado dan contexto a preguntas como «¿por qué?»; sin modelo, el asistente pide que se aclare el tema.
+
 ## Reglas
 
 - Las cifras de filtros y municipios las calcula el servidor con las funciones de la aplicación. Una cifra oculta no llega al modelo.
 - Los filtros recibidos se validan contra los valores permitidos.
 - No hace predicciones ni da orientación sobre personas concretas.
 - Si no hay evidencia en una misma frase, responde que no encuentra la información.
+- Las comparaciones entre grupos omiten las no respuestas y las bases menores de 200 personas, y aclaran que son descriptivas.
+- Cada respuesta indica su sección o página del informe, define hasta dos términos técnicos y propone preguntas de seguimiento.
 
 ## Activar el modo conectado
 
@@ -42,4 +46,4 @@ Variables opcionales: `ASISTENTE_MODELO` (por defecto `claude-opus-5-5`), `ASIST
 
 ## Pruebas
 
-`python -m dash_salud.pruebas_asistente` no usa red ni clave. Comprueba fuentes, preguntas sin respuesta, protección, límites y el modo conectado con un cliente simulado.
+`python -m dash_salud.pruebas_asistente` no usa red ni clave. Comprueba fuentes, preguntas sin respuesta, protección, límites y el modo conectado con un cliente simulado. Sus 89 preguntas las escribió el equipo y orientaron los ajustes: sirven para detectar regresiones, no como medida independiente de calidad.
