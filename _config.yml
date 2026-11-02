@@ -28,3 +28,8 @@ parse:
   myst_enable_extensions:
     - colon_fence
     - dollarmath
+
+# Las figuras de Plotly se insertan después con libro_interactivo.py; myst-nb muestra la imagen de respaldo.
+sphinx:
+  config:
+    suppress_warnings: ["mystnb.unknown_mime_type"]

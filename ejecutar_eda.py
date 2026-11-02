@@ -1,8 +1,10 @@
 """Reejecuta el cuaderno completo en un kernel limpio y guarda sus salidas.
 
 Uso: python ejecutar_eda.py
-Ejecutar con el Python que tenga pandas, numpy, matplotlib, seaborn, ipykernel,
-nbclient y nbformat instalados. El cuaderno solo se reemplaza si todo termina bien.
+Ejecutar con el Python que tenga pandas, numpy, plotly, kaleido, ipykernel, nbclient y
+nbformat instalados; kaleido usa el Chrome del equipo para las imágenes de respaldo. Los
+microdatos se leen de datos/ o de la carpeta indicada en la variable CNPV_DATOS. El
+cuaderno solo se reemplaza si todo termina bien.
 """
 
 import json
@@ -25,9 +27,10 @@ REQUIRED = [
     "CNPV2018_2HOG_A2_08.CSV",
     "CNPV2018_1VIV_A2_08.CSV",
 ]
-missing = [name for name in REQUIRED if not (ROOT / "datos" / name).is_file()]
+DATOS = Path(os.environ.get("CNPV_DATOS", ROOT / "datos"))
+missing = [name for name in REQUIRED if not (DATOS / name).is_file()]
 if missing:
-    raise FileNotFoundError("Faltan en datos/: " + ", ".join(missing))
+    raise FileNotFoundError(f"Faltan en {DATOS}: " + ", ".join(missing))
 
 with tempfile.TemporaryDirectory(prefix="eda_atlantico_jupyter_") as temporary:
     temporary = Path(temporary)

@@ -1,6 +1,7 @@
 """Ejecuta todas las celdas de código con microdatos ficticios y aislados.
 
-Esta prueba detecta errores de ejecución; no valida las cifras censales.
+Esta prueba detecta errores de ejecución; no valida las cifras censales. Las figuras se
+generan con Plotly y kaleido, que usa el Chrome del equipo para guardar las imágenes.
 """
 
 import json
@@ -9,12 +10,10 @@ import shutil
 import tempfile
 from pathlib import Path
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import pandas as pd
 
-plt.show = lambda *args, **kwargs: None
+# Los datos ficticios se leen siempre de la carpeta temporal, nunca de los microdatos reales.
+os.environ.pop("CNPV_DATOS", None)
 
 
 ROOT = Path(__file__).parent
@@ -66,7 +65,6 @@ with tempfile.TemporaryDirectory(prefix="eda_atlantico_smoke_") as temporary:
             try:
                 exec(compile(source, f"celda {index}", "exec"), namespace)
                 namespace["display"] = lambda *args, **kwargs: None
-                plt.close("all")
             except Exception as error:
                 raise RuntimeError(f"Falló la celda {index}: {error}") from error
         figures = list((workdir / "figuras").glob("*.png"))

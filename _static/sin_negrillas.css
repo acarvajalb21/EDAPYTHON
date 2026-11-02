@@ -1,0 +1,4 @@
+/* El proyecto no usa negrillas: la jerarquía la dan el tamaño, el color y el espacio.
+   Jupyter Book incluye automáticamente las hojas de estilo de _static/. Se excluyen los
+   íconos, que necesitan su propio grosor para dibujarse. */
+body *:not([class*="fa-"]):not(i) { font-weight: 400 !important; }
