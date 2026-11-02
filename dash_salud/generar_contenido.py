@@ -191,7 +191,7 @@ def diagrama_ruta(comp: dict, total: int, fuera: int) -> dict:
         ("Otra acción principal o ninguna", otras, "fuera"), ("Acudió a su EPS y no fue atendida", sin_atencion, "fuera")]]
     return {"tipo": "ruta", "titulo": "Las cuatro respuestas posibles",
             "meta": "El ancho de cada banda es proporcional a las personas que dieron esa respuesta",
-            "nota": "Son acciones principales declaradas. «Otra acción principal o ninguna» incluye automedicación, remedios caseros y boticario; no significa que la persona no recibiera ninguna atención.",
+            "nota": "Son acciones principales declaradas. «Otra acción principal o ninguna» incluye autorreceta, remedios caseros y boticario; no significa que la persona no recibiera ninguna atención.",
             "svg": svg, "lista": lista}
 
 
@@ -273,7 +273,7 @@ def construir(t: Path, relato: dict, modelo: dict, eda: dict) -> dict:
     calidad = leer(t, "calidad_variables")
     dic = leer(t, "diccionario_modelo")
     acciones = relato["acciones"]
-    nombres_accion = [("autorreceta", "Se automedicó"), ("remedios", "Remedios caseros"), ("nada", "No hizo nada"),
+    nombres_accion = [("autorreceta", "Se autorrecetó"), ("remedios", "Remedios caseros"), ("nada", "No hizo nada"),
                       ("boticario", "Boticario o droguista"), ("otras", "Otras alternativas")]
     tasa_cubo = 100 * sum(c["sin_formal"] for c in eda["cube"]) / sum(c["n"] for c in eda["cube"])
 
@@ -328,7 +328,7 @@ def construir(t: Path, relato: dict, modelo: dict, eda: dict) -> dict:
             {"etiqueta": "Fuera de la ruta formal", "valor": entero(fuera), "nota": f"{pct(tasa, 2)} de las personas estudiadas", "tono": "fuera"},
             {"etiqueta": "EPS sin atención", "valor": entero(eps_sin), "nota": f"{pct(100 * eps_sin / fuera, 1)} de quienes están fuera"}]},
         {"tipo": "parrafos", "titulo": "Descripción del problema", "parrafos": [
-            "Cuando alguien tiene un problema de salud puede acudir a su EPS, consultar a un médico particular, automedicarse, usar remedios caseros, ir a un boticario o no hacer nada. El censo de 2018 registró cuál fue su acción principal.",
+            "Cuando alguien tiene un problema de salud puede acudir a su EPS, consultar a un médico particular, autorrecetarse, usar remedios caseros, ir a un boticario o no hacer nada. El censo de 2018 registró cuál fue su acción principal.",
             f"En el Atlántico, {entero(cohorte)} personas declararon un problema de salud reciente sin hospitalización y tienen una respuesta clasificable. De ellas, {entero(fuera)} quedan fuera de la ruta formal: su acción principal no fue acudir a la EPS con atención ni a un médico particular.",
             "El propósito no es medir una negativa de atención. Es entender cómo varía esa ruta declarada entre grupos y territorios, y si las variables del censo permiten ordenar esos casos."]},
         diagrama_ruta(comp, cohorte, fuera),
@@ -494,7 +494,9 @@ def construir(t: Path, relato: dict, modelo: dict, eda: dict) -> dict:
         ("Grupo publicado", "Combinación de municipio, sexo, edad, zona y dificultad con suficientes personas para mostrarse."),
         ("Cobertura", "Parte de las personas de una selección que está en grupos publicados."),
         ("Prevalencia", "Proporción de personas fuera de la ruta formal. Es lo que se obtiene sin modelo."),
-        ("Precisión promedio (AP)", "Resume qué tan arriba quedan las personas fuera de la ruta al ordenar por puntuación. Va de la prevalencia a 1."),
+        ("Precisión promedio (AP)", "Resume qué tan arriba quedan las personas fuera de la ruta al ordenar por puntuación. Sin modelo vale la prevalencia y su máximo es 1."),
+        ("ROC-AUC", "Probabilidad de que el modelo puntúe más alto a una persona fuera de la ruta que a una dentro. El azar da 0,5."),
+        ("Brier", "Error medio de las probabilidades estimadas. Mientras más bajo, mejor."),
         ("Sensibilidad", "De quienes están fuera de la ruta, qué parte marca el modelo."),
         ("Precisión", "De quienes marca el modelo, qué parte está fuera de la ruta."),
         ("Umbral", "Puntuación a partir de la cual el modelo marca a una persona."),

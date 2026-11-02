@@ -2,17 +2,17 @@
 
 /* Dash 4 pinta sus controles con estas variables. */
 html:root {
-  --Dash-Fill-Interactive-Strong: #2454D6;
-  --Dash-Fill-Interactive-Weak: #DCE5F5;
-  --Dash-Fill-Primary-Hover: #E9EDF2;
-  --Dash-Fill-Primary-Active: #DCE5F5;
-  --Dash-Fill-Inverse-Strong: #F5F7FA;
-  --Dash-Stroke-Strong: #556378;
-  --Dash-Stroke-Weak: rgba(20, 35, 58, .15);
-  --Dash-Text-Primary: #14233A;
-  --Dash-Text-Strong: #14233A;
-  --Dash-Text-Weak: #3B4A60;
-  --Dash-Text-Disabled: #556378;
+  --Dash-Fill-Interactive-Strong: #1B6CA8;
+  --Dash-Fill-Interactive-Weak: #DCE9F3;
+  --Dash-Fill-Primary-Hover: #EEF2F5;
+  --Dash-Fill-Primary-Active: #DCE9F3;
+  --Dash-Fill-Inverse-Strong: #F7F9FB;
+  --Dash-Stroke-Strong: #54697A;
+  --Dash-Stroke-Weak: rgba(16, 41, 59, .14);
+  --Dash-Text-Primary: #10293B;
+  --Dash-Text-Strong: #10293B;
+  --Dash-Text-Weak: #3A4F60;
+  --Dash-Text-Disabled: #54697A;
 }
 
 /* Cabecera con la ruta de paradas */
