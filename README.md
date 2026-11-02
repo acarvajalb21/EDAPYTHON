@@ -26,6 +26,19 @@ La cohorte analítica tiene **136.034 personas**. La regla `ACCESO_FORMAL_SALUD 
 
 Los microdatos originales, entornos virtuales y cachés no están incluidos. Los archivos `*.joblib` son artefactos de modelos entrenados; cárguelos solo desde una fuente confiable y con versiones compatibles de Python y scikit-learn.
 
+## Cuadernos y Jupyter Book
+
+`EDA_acceso_salud_Atlantico_CNPV2018.ipynb` y `Modelo_acceso_salud_Atlantico_CNPV2018.ipynb` forman el [Jupyter Book](https://acarvajalb21.github.io/EDAPYTHON/), compilado en `docs/`. Sus gráficas usan Plotly con la gama de `DISENO.md` (`graficos_plotly.py`) y solo reciben agregados. Cada una guarda también una imagen de respaldo: GitHub muestra esa imagen y el libro la cambia por la versión interactiva.
+
+Para reejecutar los cuadernos se necesitan los microdatos, `plotly` y `kaleido` (ver `requirements.txt`); kaleido usa el Chrome del equipo para las imágenes. Indique la carpeta de los CSV en la variable `CNPV_DATOS`. El exploratorio se ejecuta con `python ejecutar_eda.py` y el del modelo, desde Jupyter en la raíz. Para compilar el libro:
+
+```bash
+jupyter-book build . --path-output CARPETA
+python libro_interactivo.py CARPETA/_build/html
+```
+
+Después se copia el contenido de `CARPETA/_build/html` en `docs/`.
+
 ## Material anterior
 
-`EDA_acceso_salud_Atlantico_CNPV2018.ipynb`, `dashboard/`, `docs/` y el `Dockerfile` de la raíz conservan la entrega previa de Jupyter Book y Dash Python. No son el punto de entrada del tablero actual. El servicio anterior `eda-salud-atlantico-python` y el servicio `dash` no se modifican desde los scripts del tablero vigente.
+`dashboard/` y el `Dockerfile` de la raíz conservan la entrega previa de Dash Python. No son el punto de entrada del tablero actual. El servicio anterior `eda-salud-atlantico-python` y el servicio `dash` no se modifican desde los scripts del tablero vigente.

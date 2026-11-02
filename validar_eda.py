@@ -1,5 +1,6 @@
 """Comprueba la estructura del proyecto antes de reejecutar el cuaderno."""
 
+import os
 import json
 import re
 import csv
@@ -32,7 +33,8 @@ for name in ("01_distribucion_acceso", "02_histogramas_cuantitativas",
 
 required = ["CNPV2018_5PER_A2_08.CSV", "CNPV2018_2HOG_A2_08.CSV",
             "CNPV2018_1VIV_A2_08.CSV"]
-missing = [name for name in required if not (ROOT / "datos" / name).is_file()]
+DATOS = Path(os.environ.get("CNPV_DATOS", ROOT / "datos"))
+missing = [name for name in required if not (DATOS / name).is_file()]
 print(f"OK: {len(code_cells)} celdas de código compilan; 23 códigos MGN únicos; 9 figuras presentes.")
 if missing:
     print("Reejecución completa pendiente: faltan " + ", ".join(missing))
