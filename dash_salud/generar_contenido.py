@@ -195,13 +195,19 @@ def diagrama_ruta(comp: dict, total: int, fuera: int) -> dict:
             "svg": svg, "lista": lista}
 
 
-def pagina_modelo(modelo: dict) -> dict:
+def pagina_modelo(modelo: dict, t: Path) -> dict:
     prueba = modelo["models"]["hist_gradient_boosting"]["test"]
     base = modelo["models"]["baseline"]["test"]
     cambio = modelo["version_change"]
     auditoria = modelo["audit_2026"]
     equidad = modelo["equity"]
     ic = modelo["uncertainty"]["intervals_95"]["selected_ap"]
+    n, prev = modelo["metadata"]["test_n"], modelo["metadata"]["test_positive"] / modelo["metadata"]["test_n"]
+    c05 = min(modelo["thresholds"], key=lambda r: abs(r["threshold"] - 0.5))
+    s05 = c05["tp"] / max(c05["tp"] + c05["fn"], 1)
+    exactitud = (prueba["confusion"]["tn"] + prueba["confusion"]["tp"]) / n
+    top10 = next(r for r in modelo["prioritization"] if abs(r["fraction"] - 0.10) < 1e-9)
+    mej = {k: float(v) for k, v in leer(t, "experimento_mejora_resumen")[0].items()}
     escenarios = {"v1_umbral_validado": "Versión 1, su umbral", "v2_mismas_personas_marcadas": "Versión 2, mismas personas marcadas",
                   "v2_umbral_validado": "Versión 2, su umbral"}
     grupos = [[e, entero(modelo["same_flagged"][k]["flagged"]), pct(100 * modelo["same_flagged"][k]["recall"]),
@@ -241,6 +247,24 @@ def pagina_modelo(modelo: dict) -> dict:
             "importancia": {"titulo": "Variables que más ayudaron a ordenar", "meta": "Cuánto cae la precisión promedio si se desordena la variable", "nota": "En azul, las dos variables añadidas. Mide dependencia del modelo, no efecto causal."},
         },
         "despues": [
+            {"tipo": "lista", "titulo": "Por qué las cifras parecen bajas", "columnas": 2, "items": [
+                {"rotulo": "Con el corte de 0,5 casi no marca a nadie",
+                 "texto": f"Solo una de cada cinco personas está fuera de la ruta y las probabilidades están calibradas, así que rara vez pasan de 0,5. Con ese corte detecta {pct(100 * s05)} de los casos. Por eso se usa el umbral validado, {coma(modelo['metadata']['chosen_threshold'], 4)}, que detecta {pct(100 * prueba['recall'])}."},
+                {"rotulo": "La exactitud engaña",
+                 "texto": f"Decir siempre «dentro de la ruta» acierta {pct(100 * (1 - prev))} sin encontrar a nadie. Con el umbral validado la exactitud es {pct(100 * exactitud)} y la exactitud balanceada, {pct(100 * (prueba['recall'] + prueba['specificity']) / 2)}. Por eso la métrica principal es la precisión promedio, comparada con la referencia."},
+                {"rotulo": "Sí ordena mejor que el azar",
+                 "texto": f"Entre el 10 % con mayor puntuación, {pct(100 * top10['precision'])} está fuera de la ruta: {coma(top10['lift'], 1)} veces la proporción general de {pct(100 * prev)}. La precisión promedio pasa de {coma(base['pr_auc'])} sin modelo a {coma(prueba['pr_auc'])}."},
+                {"rotulo": "El techo está en los datos",
+                 "texto": f"El censo no registra gravedad, tiempo de espera, distancia ni preferencias, que deciden buena parte de la acción. Las {auditoria['alternatives']} variantes de ajuste probadas no mejoraron; la mejora llegó solo con información nueva."}]},
+            {"tipo": "lista", "titulo": "¿Se puede mejorar? Lo que probamos", "columnas": 2, "items": [
+                {"rotulo": "Otro algoritmo casi no cambia nada",
+                 "texto": f"Con las mismas variables, LightGBM obtuvo una precisión promedio de {coma(mej['ap_lightgbm_mismas'])} en validación, frente a {coma(mej['ap_v2'])} del modelo actual."},
+                {"rotulo": "Las respuestas de los vecinos sí suben la cifra",
+                 "texto": f"Añadir qué proporción de los vecinos de la sección y la manzana quedó fuera de la ruta llevó la precisión promedio a {coma(mej['ap_candidato'])}, una mejora de {coma(mej['delta_ap'])} (intervalo de 95 %: {coma(mej['delta_ap_inf'])} a {coma(mej['delta_ap_sup'])})."},
+                {"rotulo": "Pero no sirve en zonas nuevas",
+                 "texto": f"En secciones censales que el modelo no vio, ese candidato obtuvo {coma(mej['ap_seccion_candidato'])}, frente a {coma(mej['ap_seccion_v2'])} del modelo actual: la ganancia depende de conocer de antemano lo que respondieron los vecinos."},
+                {"rotulo": "Por eso se conserva la versión 2",
+                 "texto": "El límite está en la información del censo, no en el algoritmo. La prueba reservada no se usó en este experimento."}]},
             {"tipo": "columnas", "bloques": [
                 {"tipo": "tabla", "titulo": "Si solo se revisara una parte", "meta": "Personas de la prueba ordenadas por puntuación", "texto_cols": 1,
                  "columnas": ["Se revisa", "Personas", "Fuera de la ruta", "Precisión", "Sensibilidad"], "filas": priorizacion,
@@ -267,6 +291,10 @@ def construir(t: Path, relato: dict, modelo: dict, eda: dict) -> dict:
     prevalencia = next(m for m in modelos if m["codigo"] == "baseline")
     elegido = next(m for m in modelos if m["codigo"] == "hist_gradient_boosting")
     part = leer(t, "particiones")
+    total_part = sum(int(p["n"]) for p in part)
+    reales = [m for m in modelos if m["codigo"] != "baseline"]
+    segundo = sorted((m for m in reales if m["codigo"] != elegido["codigo"]), key=lambda m: -float(m["ap_validacion"]))[0]
+    bosque = next(m for m in modelos if m["codigo"] == "random_forest")
     inc = {f["metrica"]: f for f in leer(t, "incertidumbre")}
     ctx = leer(t, "contexto_comparacion")
     dec = leer(t, "contexto_decision")[0]
@@ -434,9 +462,27 @@ def construir(t: Path, relato: dict, modelo: dict, eda: dict) -> dict:
             {"titulo": "Separación", "texto": "Entrenamiento, validación y prueba, sin repartir una misma vivienda entre particiones."},
             {"titulo": "Preparación", "texto": "Imputación y codificación dentro de cada partición del pipeline."},
             {"titulo": "Elección", "texto": "Modelo y umbral se eligen en validación; la prueba se reserva para evaluarlos."}]},
+        {"tipo": "lista", "titulo": "Cómo dividimos los datos", "columnas": 2, "items": [
+            {"rotulo": f"Entrenamiento: {pct(100 * int(part[0]['n']) / total_part)}",
+             "texto": f"{entero(part[0]['n'])} personas. Aquí cada modelo aprende y se buscan sus hiperparámetros con validación cruzada de 3 pliegues, sin mirar las otras dos partes."},
+            {"rotulo": f"Validación: {pct(100 * int(part[1]['n']) / total_part)}",
+             "texto": f"{entero(part[1]['n'])} personas. Sirve para elegir el modelo ganador y el umbral de clasificación."},
+            {"rotulo": f"Prueba: {pct(100 * int(part[2]['n']) / total_part)}",
+             "texto": f"{entero(part[2]['n'])} personas. Se reservó hasta el final y se usó una sola vez para medir el modelo ya elegido."},
+            {"rotulo": "Por vivienda y estratificada",
+             "texto": "Se dividió en siete grupos iguales con StratifiedGroupKFold (semilla 42): cinco para entrenamiento, uno para validación y uno para prueba. Las personas de una vivienda quedan juntas, para no evaluar con hogares que el modelo ya vio, y cada parte conserva la misma proporción fuera de la ruta."}]},
+        {"tipo": "lista", "titulo": f"Por qué escogimos el {elegido['modelo'].lower()}", "columnas": 2, "items": [
+            {"rotulo": "1. Ganó con la regla fijada de antemano",
+             "texto": f"La regla era elegir la mayor precisión promedio (AP) en validación. Obtuvo {coma(elegido['ap_validacion'])}, frente a {coma(segundo['ap_validacion'])} del {segundo['modelo'].lower()} y {coma(prevalencia['ap_validacion'])} sin modelo."},
+            {"rotulo": "2. Ganó en todas las métricas",
+             "texto": f"También tuvo el mayor ROC-AUC ({coma(elegido['roc_auc_prueba'])}) y el menor Brier ({coma(elegido['brier_prueba'])}) en la prueba. No depende de una sola cifra."},
+            {"rotulo": "3. La ventaja es pequeña, pero no es azar",
+             "texto": f"Diferencia de AP en prueba frente al bosque aleatorio: {coma(float(elegido['ap_prueba']) - float(bosque['ap_prueba']))}, con intervalo pareado del 95 % de {coma(inc['delta_ap_vs_competitor']['inferior'])} a {coma(inc['delta_ap_vs_competitor']['superior'])} (250 remuestreos por vivienda). No incluye cero, aunque no cubre la variabilidad del entrenamiento."},
+            {"rotulo": "4. Se ajusta a estos datos",
+             "texto": "Trata municipio, sexo y materiales como categorías y aprende combinaciones entre variables sin escribirlas a mano. La regresión logística, más sencilla, quedó cerca: la mejora del boosting es real pero modesta."}]},
         {"tipo": "columnas", "bloques": [
-            {"tipo": "tabla", "titulo": "Separación por vivienda", "meta": "Cada partición conserva la misma proporción fuera de la ruta", "columnas": ["Partición", "Personas", "Viviendas", "Prevalencia"], "texto_cols": 1,
-             "filas": [[p["particion"], entero(p["n"]), entero(p["viviendas"]), pct(float(p["porcentaje_sin_formal"]), 2)] for p in part],
+            {"tipo": "tabla", "titulo": "Separación por vivienda", "meta": "Cada partición conserva la misma proporción fuera de la ruta", "columnas": ["Partición", "Personas", "Porcentaje", "Viviendas", "Prevalencia"], "texto_cols": 1,
+             "filas": [[p["particion"], entero(p["n"]), pct(100 * int(p["n"]) / total_part), entero(p["viviendas"]), pct(float(p["porcentaje_sin_formal"]), 2)] for p in part],
              "nota": "La búsqueda de parámetros usó validación cruzada de tres particiones, agrupada por vivienda. No se usó sobremuestreo sintético."},
             {"tipo": "tabla", "titulo": "Hiperparámetros elegidos", "meta": "Boosting de histogramas", "columnas": ["Parámetro", "Valor"], "texto_cols": 1,
              "filas": [[f["parametro"], coma(f["valor"], 2) if "." in f["valor"] else f["valor"]] for f in leer(t, "hiperparametros")],
@@ -542,7 +588,7 @@ def construir(t: Path, relato: dict, modelo: dict, eda: dict) -> dict:
         "secciones": [{"id": a, "etiqueta": b} for a, b in SECCIONES],
         "paginas": {"panorama": panorama, "objetivos": objetivos, "problema": problema, "marco": marco,
                     "univariado": univariado, "creacion": creacion, "conclusiones": conclusiones},
-        "modelo": pagina_modelo(modelo),
+        "modelo": pagina_modelo(modelo, t),
         "explorar": {
             "titulo": "Comparar grupos",
             "entrada": "Elige un grupo de personas y mira qué proporción quedó fuera de la ruta formal: su acción principal no fue acudir a la EPS con atención ni a un médico particular.",

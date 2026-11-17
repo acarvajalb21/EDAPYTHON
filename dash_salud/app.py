@@ -200,12 +200,12 @@ def ranked_figure(rows: list[dict], metric: str, sexo, edad, zona, dificultad) -
         x = [100 * r["sin_formal"] / r["n"] for r in data]
         xlabel = "Porcentaje aproximado (%)"
         hover = "%{y}<br>%{x:.1f} % aprox.<br>Base: %{customdata[0]:,}<extra></extra>"
-    fig = go.Figure(go.Bar(x=x, y=[r["municipio"] for r in data], orientation="h",
+    fig = go.Figure(go.Bar(x=x, y=[r["municipio"] for r in data], orientation="h", name="Fuera de la ruta formal",
                            marker_color=FUERA, customdata=[[r["n"]] for r in data],
                            hovertemplate=hover))
     fig.update_layout(xaxis_title=xlabel, yaxis_title="", bargap=0.34)
     fig.update_yaxes(gridcolor="rgba(0,0,0,0)", ticks="")
-    return figure_base(fig, height=max(170, 58 + 25 * len(data)), margin=dict(l=8, r=18, t=6, b=44))
+    return figure_base(fig, height=max(200, 88 + 25 * len(data)), legend=True, margin=dict(l=8, r=18, t=34, b=44))
 
 
 def age_figure(rows: list[dict], municipios, sexo, zona, dificultad) -> go.Figure:
@@ -271,16 +271,18 @@ def composition_figure(rows: list[dict], municipios, sexo, edad, zona, dificulta
 def comparison_figure() -> go.Figure:
     keys = ["baseline", "logistica", "random_forest", "hist_gradient_boosting"]
     top = max(MODEL["models"][k]["test"]["pr_auc"] for k in keys)
-    fig = go.Figure(go.Bar(
-        x=[MODEL_NAMES[k] for k in keys],
-        y=[MODEL["models"][k]["test"]["pr_auc"] for k in keys],
-        marker_color=[REFERENCIA, BASE, BASE, DENTRO],
-        text=[f"{MODEL['models'][k]['test']['pr_auc']:.3f}".replace(".", ",") for k in keys],
-        textposition="outside", hovertemplate="%{x}<br>Precisión promedio: %{y:.3f}<extra></extra>",
-    ))
-    fig.update_layout(xaxis_title="", yaxis_title="Precisión promedio (AP)", yaxis_range=[0, top * 1.2], bargap=0.34)
-    fig.update_xaxes(gridcolor="rgba(0,0,0,0)", ticks="")
-    return figure_base(fig, height=340)
+    fig = go.Figure()
+    # Una traza por papel para que la leyenda explique los colores.
+    for papel, color, grupo in (("Referencia sin modelo", REFERENCIA, ["baseline"]),
+                                ("Otros candidatos", BASE, ["logistica", "random_forest"]),
+                                ("Modelo elegido", DENTRO, ["hist_gradient_boosting"])):
+        fig.add_bar(x=[MODEL_NAMES[k] for k in grupo], y=[MODEL["models"][k]["test"]["pr_auc"] for k in grupo],
+                    name=papel, marker_color=color,
+                    text=[f"{MODEL['models'][k]['test']['pr_auc']:.3f}".replace(".", ",") for k in grupo],
+                    textposition="outside", hovertemplate="%{x}<br>Precisión promedio: %{y:.3f}<extra></extra>")
+    fig.update_layout(xaxis_title="", yaxis_title="Precisión promedio (AP) en prueba", yaxis_range=[0, top * 1.2], bargap=0.34)
+    fig.update_xaxes(gridcolor="rgba(0,0,0,0)", ticks="", categoryorder="array", categoryarray=[MODEL_NAMES[k] for k in keys])
+    return figure_base(fig, height=340, legend=True, margin=dict(l=52, r=18, t=34, b=46))
 
 
 def curve_figure(kind: str = "roc") -> go.Figure:
@@ -316,13 +318,16 @@ def calibration_figure() -> go.Figure:
 
 def importance_figure() -> go.Figure:
     data = sorted(MODEL["importance"][:8], key=lambda x: x["mean_ap_drop"])
-    fig = go.Figure(go.Bar(x=[r["mean_ap_drop"] for r in data],
-                           y=[FEATURE_NAMES.get(r["feature"], r["feature"]) for r in data],
-                           orientation="h", marker_color=[DENTRO if r["feature"] in NUEVAS else BASE for r in data],
-                           hovertemplate="%{y}<br>Caída de la precisión promedio: %{x:.3f}<extra></extra>"))
-    fig.update_layout(xaxis_title="Caída de la precisión promedio", yaxis_title="", bargap=0.34)
-    fig.update_yaxes(gridcolor="rgba(0,0,0,0)", ticks="")
-    return figure_base(fig, height=340, margin=dict(l=8, r=18, t=6, b=44))
+    orden = [FEATURE_NAMES.get(r["feature"], r["feature"]) for r in data]
+    fig = go.Figure()
+    for papel, color, nuevas in (("Variables de la versión 1", BASE, False), ("Variables de contexto añadidas", DENTRO, True)):
+        parte = [r for r in data if (r["feature"] in NUEVAS) == nuevas]
+        fig.add_bar(x=[r["mean_ap_drop"] for r in parte], y=[FEATURE_NAMES.get(r["feature"], r["feature"]) for r in parte],
+                    orientation="h", name=papel, marker_color=color,
+                    hovertemplate="%{y}<br>Caída de la precisión promedio: %{x:.3f}<extra></extra>")
+    fig.update_layout(xaxis_title="Caída de la precisión promedio al desordenar la variable", yaxis_title="", bargap=0.34)
+    fig.update_yaxes(gridcolor="rgba(0,0,0,0)", ticks="", categoryorder="array", categoryarray=orden)
+    return figure_base(fig, height=360, legend=True, margin=dict(l=8, r=18, t=34, b=44))
 
 
 def threshold_row(value: float) -> dict:
@@ -354,13 +359,16 @@ def barras_figure(b: dict) -> go.Figure:
     bases = b.get("bases", [None] * len(valores))[::-1]
     textos = [fmt_pct(v / 100) if b["unidad"] == "%" else fmt_int(v) for v in valores]
     detalle = [texto if base is None else f"{texto} · base aproximada {fmt_int(base)}" for texto, base in zip(textos, bases)]
+    unidad = "%" if b["unidad"] == "%" else "personas"
+    nombre = {"fuera": f"Fuera de la ruta formal ({unidad})", "dentro": f"Dentro de la ruta formal ({unidad})"}.get(
+        b["color"], b.get("meta") or ("Porcentaje" if unidad == "%" else "Personas"))
     fig = go.Figure(go.Bar(x=valores, y=b["categorias"][::-1], orientation="h", text=textos, textposition="outside", cliponaxis=False,
-                           marker_color={"fuera": FUERA, "dentro": DENTRO}.get(b["color"], TINTA_SUAVE),
+                           name=nombre, marker_color={"fuera": FUERA, "dentro": DENTRO}.get(b["color"], TINTA_SUAVE),
                            customdata=detalle, hovertemplate="%{y}<br>%{customdata}<extra></extra>"))
     fig.update_layout(bargap=0.34)
     fig.update_xaxes(visible=False, range=[0, max(valores) * 1.2])
     fig.update_yaxes(gridcolor="rgba(0,0,0,0)", ticks="")
-    return figure_base(fig, height=max(170, 58 + 25 * len(valores)), margin=dict(l=8, r=18, t=6, b=6))
+    return figure_base(fig, height=max(200, 88 + 25 * len(valores)), legend=True, margin=dict(l=8, r=18, t=34, b=6))
 
 
 def caja(contenido: list, titulo: str | None = None, meta: str | None = None, nota: str | None = None) -> html.Div:

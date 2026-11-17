@@ -170,6 +170,102 @@ def entero(valor) -> str:
     return f"{int(valor):,}".replace(",", ".")
 
 
+def buscar_tabla(bloques, titulo: str) -> dict | None:
+    """Primera tabla con ese título en un árbol de bloques de contenido.json."""
+    for b in bloques if isinstance(bloques, list) else []:
+        if b.get("tipo") == "tabla" and b.get("titulo") == titulo:
+            return b
+        hijos = b.get("bloques") or [x for p in b.get("pestanas", []) for x in p["bloques"]]
+        hallada = buscar_tabla(hijos, titulo)
+        if hallada:
+            return hallada
+    return None
+
+
+def lista_natural(partes: list[str]) -> str:
+    return partes[0] if len(partes) == 1 else f"{', '.join(partes[:-1])} y {partes[-1]}"
+
+
+def numero(texto: str) -> int:
+    return int(str(texto).replace(".", ""))
+
+
+def respuestas_del_modelo(modelo: dict, contenido: dict) -> list[tuple[str, str, str, str]]:
+    """Preguntas frecuentes de una revisión académica: elección, partición y lectura de las métricas."""
+    modelos = modelo["models"]
+    nombres = {"baseline": "la referencia sin modelo (predecir siempre la prevalencia)", "logistica": "la regresión logística regularizada",
+               "random_forest": "el bosque aleatorio (Random Forest)", "hist_gradient_boosting": "el boosting de histogramas (Hist Gradient Boosting)"}
+    reales = [k for k in ("logistica", "random_forest", "hist_gradient_boosting")]
+    elegido = modelo["metadata"]["selected_model"]
+    t = modelos[elegido]["test"]
+    base = modelos["baseline"]["test"]
+    c = t["confusion"]
+    n = modelo["metadata"]["test_n"]
+    positivos = modelo["metadata"]["test_positive"]
+    prevalencia = positivos / n
+    cero5 = min(modelo["thresholds"], key=lambda r: abs(r["threshold"] - 0.5))
+    exactitud = (c["tn"] + c["tp"]) / n
+    exactitud_05 = (cero5["tn"] + cero5["tp"]) / n
+    sens_05 = cero5["tp"] / max(cero5["tp"] + cero5["fn"], 1)
+    exactitud_balanceada = (t["recall"] + t["specificity"]) / 2
+    ic = modelo["uncertainty"]["intervals_95"]
+    rival = modelo["uncertainty"]["competitor"]
+    top10 = next(r for r in modelo["prioritization"] if abs(r["fraction"] - 0.10) < 1e-9)
+    por_val = sorted(reales, key=lambda k: -modelos[k]["validation_ap"])
+    peor = por_val[-1]
+    pct = lambda v, d=1: coma(100 * v, d) + " %"
+    lista_ap = "; ".join(f"{nombres[k].split(' (')[0]}: {coma(modelos[k]['validation_ap'])} en validación y {coma(modelos[k]['test']['pr_auc'])} en prueba"
+                         for k in ("baseline", "logistica", "random_forest", "hist_gradient_boosting"))
+    sep = buscar_tabla(contenido["paginas"]["creacion"]["bloques"], "Separación por vivienda")
+    col = {nombre: k for k, nombre in enumerate(sep["columnas"])}
+    filas = {f[0]: (numero(f[col["Personas"]]), numero(f[col["Viviendas"]])) for f in sep["filas"]}
+    total = sum(p for p, _ in filas.values())
+    reparto = ", ".join(f"{nombre.lower()} {entero(p)} personas ({pct(p / total)}) de {entero(v)} viviendas" for nombre, (p, v) in filas.items())
+    hip = buscar_tabla(contenido["paginas"]["creacion"]["bloques"], "Hiperparámetros elegidos")
+    hip_texto = ", ".join(f"{f[0]} = {f[1]}" for f in hip["filas"])
+    importancia = modelo["importance"][:3]
+    nombres_var = {"U_MPIO": "municipio", "HOGAR_OTROS_ENFERMOS": "otras personas del hogar con problema de salud", "P_EDADR": "edad",
+                   "SECCION_PCT_ENFERMOS": "proporción con problema de salud en la sección censal"}
+    top = [f"{nombres_var.get(r['feature'], r['feature'])} ({coma(r['mean_ap_drop'])})" for r in importancia]
+    mejora = next(b for b in contenido["modelo"]["despues"] if b.get("titulo") == "¿Se puede mejorar? Lo que probamos")
+    return [
+        ("modelo", "Modelo", "¿Se puede mejorar el modelo?",
+         " ".join(f"{i['rotulo']}: {i['texto']}" for i in mejora["items"])),
+        ("creacion", "Modelado", "¿Cuál es el mejor modelo?",
+         f"El mejor de los candidatos evaluados fue {nombres[elegido]}. Tuvo la mayor precisión promedio (AP) en validación cruzada, en validación y en prueba, además del mayor ROC-AUC y el menor Brier. Precisión promedio por modelo: {lista_ap}. «Mejor» significa mejor entre estos cuatro bajo el mismo protocolo, no el mejor modelo posible."),
+        ("creacion", "Modelado", "¿Por qué se escogió ese modelo?",
+         f"Por cuatro razones. 1) La regla de selección, fijada antes de mirar la prueba, era la mayor precisión promedio (AP) en validación, y el boosting ganó con {coma(modelos[elegido]['validation_ap'])}, frente a {coma(modelos[por_val[1]]['validation_ap'])} del segundo. 2) También ganó en las demás métricas: ROC-AUC {coma(t['roc_auc'])} y Brier {coma(t['brier'])}. 3) La diferencia de AP en prueba, boosting menos {nombres[rival].split(' (')[0]}, fue {coma(t['pr_auc'] - modelos[rival]['test']['pr_auc'])}, con intervalo pareado del 95 % de {coma(ic['delta_ap_vs_competitor'][0])} a {coma(ic['delta_ap_vs_competitor'][1])} (bootstrap de 250 remuestreos por vivienda): no incluye cero, pero es una ventaja pequeña y el intervalo no cubre la variabilidad del entrenamiento ni de la selección. 4) Trata municipio, sexo y materiales como categorías y capta combinaciones entre variables sin especificarlas a mano."),
+        ("creacion", "Modelado", "¿Qué modelos se compararon?",
+         f"Cuatro, bajo los mismos datos y particiones: {nombres['baseline']}, {nombres['logistica']}, {nombres['random_forest']} y {nombres['hist_gradient_boosting']}. Precisión promedio: {lista_ap}."),
+        ("creacion", "Modelado", "¿Cuál fue el peor modelo?",
+         f"Sin contar la referencia, el de menor precisión promedio en validación fue {nombres[peor]}, con {coma(modelos[peor]['validation_ap'])}. La referencia sin modelo obtuvo {coma(modelos['baseline']['validation_ap'])}: todos los modelos la superan, pero las diferencias entre ellos son pequeñas."),
+        ("creacion", "Modelado", "¿Cómo se dividieron los datos de entrenamiento y prueba?",
+         f"Se separaron en tres partes, con proporciones 5/7, 1/7 y 1/7: {reparto}. La división es estratificada, para que cada parte tenga la misma proporción fuera de la ruta, y agrupada por vivienda: las personas de una misma vivienda quedan en una sola parte, para no evaluar con hogares que el modelo ya vio. Con entrenamiento se ajustan los modelos y se buscan hiperparámetros con validación cruzada de 3 pliegues; con validación se elige el modelo y el umbral; la prueba se usa una sola vez al final."),
+        ("creacion", "Modelado", "¿Qué hiperparámetros usa el modelo?",
+         f"El boosting de histogramas elegido usa {hip_texto}. Se escogieron con validación cruzada de 3 pliegues dentro del entrenamiento, buscando la mayor precisión promedio. La parada temprana se desactivó para no crear otra partición."),
+        ("modelo", "Modelo", "¿Por qué las métricas del modelo son bajas?",
+         f"Porque el censo no registra lo que más decide la acción: la gravedad del problema, el tiempo de espera, la distancia o la preferencia de la persona. Con solo datos de persona, hogar y vivienda, el modelo ordena mejor que el azar, pero con discriminación moderada: ROC-AUC {coma(t['roc_auc'])} y precisión promedio {coma(t['pr_auc'])}, frente a {coma(base['pr_auc'])} sin modelo. Sí aporta: entre el 10 % con mayor puntuación, {pct(top10['precision'])} está fuera de la ruta, {coma(top10['lift'], 1)} veces la prevalencia de {pct(prevalencia)}. Antes se probaron {modelo['audit_2026']['alternatives']} variantes de preparación y ajuste sin ganancia; la mejora solo llegó con información nueva."),
+        ("modelo", "Modelo", "¿El modelo predice?",
+         f"Sí, pero hay que usar el umbral validado. Con el corte convencional de 0,5 casi no marca a nadie: detecta solo {pct(sens_05)} de los casos, porque sus probabilidades rara vez pasan de 0,5 cuando la clase es de {pct(prevalencia)}. Con el umbral elegido en validación, {coma(modelo['metadata']['chosen_threshold'], 4)}, detecta {entero(c['tp'])} de {entero(positivos)} personas fuera de la ruta ({pct(t['recall'])}), con precisión de {pct(t['precision'])}."),
+        ("modelo", "Modelo", "¿Por qué no se usa el umbral de 0,5?",
+         f"Porque solo una de cada cinco personas está fuera de la ruta y el modelo está calibrado: sus probabilidades rara vez superan 0,5. Con ese corte la sensibilidad es {pct(sens_05)}. Por eso el umbral se eligió en validación maximizando F1: {coma(modelo['metadata']['chosen_threshold'], 4)}."),
+        ("modelo", "Modelo", "¿Cuál es la exactitud del modelo?",
+         f"Con el umbral validado, la exactitud (accuracy) en prueba es {pct(exactitud)} y la exactitud balanceada, {pct(exactitud_balanceada)}. No se usa como métrica principal porque engaña con clases desiguales: decir siempre «dentro de la ruta» acierta {pct(1 - prevalencia)} sin encontrar ningún caso, y con el corte de 0,5 el modelo llega a {pct(exactitud_05)} detectando apenas {pct(sens_05)}. Por eso se usa la precisión promedio."),
+        ("modelo", "Modelo", "¿Qué es la matriz de confusión?",
+         f"Es la tabla que cruza lo observado con lo predicho. En la prueba, con el umbral validado: {entero(c['tp'])} detectados, {entero(c['fn'])} no detectados, {entero(c['fp'])} falsas alarmas y {entero(c['tn'])} verdaderos negativos. Está en la sección Modelo, donde se puede mover el umbral."),
+        ("modelo", "Modelo", "¿Cuál es la variable más importante?",
+         f"Por importancia por permutación (cuánto cae la precisión promedio al desordenar la variable), las primeras son {lista_natural(top)}. Mide cuánto depende el modelo de cada variable, no su efecto causal."),
+        ("creacion", "Modelado", "¿Qué es la referencia o baseline?",
+         f"Es el punto de comparación mínimo: asigna a todas las personas la misma probabilidad, la proporción fuera de la ruta del entrenamiento. Su precisión promedio es {coma(base['pr_auc'])} y su ROC-AUC, 0,500. Un modelo solo aporta si supera esa referencia."),
+        ("creacion", "Modelado", "¿Qué es el boosting de histogramas?",
+         "Es un método que construye muchos árboles de decisión pequeños en secuencia: cada árbol corrige los errores de los anteriores. «De histogramas» indica que agrupa los valores en intervalos para entrenar rápido con muchas personas. Es la implementación HistGradientBoostingClassifier de scikit-learn."),
+        ("creacion", "Modelado", "¿Cómo se evitó la fuga de información?",
+         "Se excluyeron los campos que construyen la respuesta o son posteriores a la atención, se separó por vivienda y la imputación y la codificación se aprendieron solo con entrenamiento, dentro del pipeline. El modelo y el umbral se eligieron en validación, y la prueba se consultó al final."),
+        ("problema", "Problema", "¿Cuál es la variable objetivo?",
+         "Es SIN_ACCESO: vale 1 si la acción principal declarada no fue acudir a la EPS con atención ni a un médico particular (fuera de la ruta formal) y 0 si sí lo fue. Equivale a ACCESO_FORMAL_SALUD = 0. Es la clase positiva de las métricas."),
+    ]
+
+
 def respuestas_de_referencia(modelo: dict, relato: dict, contenido: dict) -> list[dict]:
     """Respuestas a las preguntas más comunes, con cifras leídas de los resultados validados."""
     t = modelo["models"]["hist_gradient_boosting"]["test"]
@@ -278,6 +374,10 @@ def respuestas_de_referencia(modelo: dict, relato: dict, contenido: dict) -> lis
         ("marco", "Marco teórico", "¿Qué es una EPS?",
          "En el proyecto, la EPS es la entidad a la que la Ley 100 de 1993 asigna la afiliación y la tarea de organizar y garantizar la prestación del plan de salud a sus afiliados. El censo pregunta si la persona acudió a su entidad de seguridad social."),
     ]
+    # Las respuestas nuevas reemplazan a las anteriores con el mismo título.
+    nuevas = respuestas_del_modelo(modelo, contenido)
+    titulos_nuevos = {f[2] for f in nuevas}
+    filas = [f for f in filas if f[2] not in titulos_nuevos and f[2] != "¿Cómo se dividieron los datos?"] + nuevas
     salida = []
     for seccion, nombre, titulo, texto in filas:
         p = pasaje(titulo, f"Aplicación, sección {nombre}", texto, "respuesta")

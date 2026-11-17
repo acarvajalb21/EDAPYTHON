@@ -34,9 +34,9 @@
     <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=3c74b3bc" />
     <link rel="stylesheet" type="text/css" href="_static/togglebutton.css?v=9c3e77be" />
     <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
-    <link rel="stylesheet" type="text/css" href="_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+    <link rel="stylesheet" type="text/css" href="_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css?v=8cd3d715" />
     <link rel="stylesheet" type="text/css" href="_static/sphinx-thebe.css?v=4fa983c6" />
-    <link rel="stylesheet" type="text/css" href="_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-design.min.css?v=6a604523" />
     <link rel="stylesheet" type="text/css" href="_static/sin_negrillas.css?v=c9716677" />
   
   <!-- So that users can add custom icons -->
@@ -56,7 +56,7 @@
     <script>let toggleOpenOnPrint = 'true';</script>
     <script src="_static/togglebutton.js?v=b8b12719"></script>
     <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
-    <script src="_static/design-tabs.js?v=f930bc37"></script>
+    <script data-sd-tabs-storage-prefix="sphinx-design-tab-id-" src="_static/design-tabs.js?v=fcb327ea"></script>
     <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"; const thebe_selector = ".thebe,.cell"; const thebe_selector_input = "pre"; const thebe_selector_output = ".output, .cell_output"</script>
     <script async="async" src="_static/sphinx-thebe.js?v=c100c467"></script>
     <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
@@ -392,10 +392,14 @@
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#particiones-y-preprocesamiento">4. Particiones y preprocesamiento</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#modelos-candidatos">5. Modelos candidatos</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#modelos-candidatos">5. Modelos candidatos</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#por-que-escogimos-el-boosting-de-histogramas">¿Por qué escogimos el boosting de histogramas?</a></li>
+</ul>
+</li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#por-que-existe-una-version-2">6. Por qué existe una versión 2</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#modelo-final-y-umbral">7. Modelo final y umbral</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evaluacion-en-la-prueba-interna">8. Evaluación en la prueba interna</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#por-que-las-metricas-se-ven-bajas-el-modelo-predice">¿Por qué las métricas se ven bajas? ¿El modelo predice?</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#calibracion">Calibración</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#umbral-y-priorizacion">Umbral y priorización</a></li>
 </ul>
@@ -403,6 +407,7 @@
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#variables-mas-influyentes">9. Variables más influyentes</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#diferencias-entre-grupos">10. Diferencias entre grupos</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#como-se-usa-el-modelo-guardado">11. Cómo se usa el modelo guardado</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bis-se-puede-mejorar-experimento-de-noviembre-de-2026">11 bis. ¿Se puede mejorar? Experimento de noviembre de 2026</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#conclusiones">12. Conclusiones</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#limites">Límites</a></li>
 </ul>
@@ -479,6 +484,12 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">average_precision_score</span><span class="p">,</span> <span class="n">brier_score_loss</span><span class="p">,</span> <span class="n">precision_recall_curve</span><span class="p">,</span> <span class="n">roc_auc_score</span><span class="p">,</span> <span class="n">roc_curve</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">Pipeline</span>
 
+<span class="c1"># El modelo se mantiene una sola vez, junto a los entregables.</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="n">PROYECTO</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="p">(</span><span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">(),</span> <span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">()</span><span class="o">.</span><span class="n">parent</span><span class="p">)</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">p</span> <span class="o">/</span> <span class="s1">'ml_salud'</span> <span class="o">/</span> <span class="s1">'esquema.py'</span><span class="p">)</span><span class="o">.</span><span class="n">is_file</span><span class="p">())</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">PROYECTO</span><span class="p">))</span>
+
 <span class="kn">from</span><span class="w"> </span><span class="nn">ml_salud.contexto</span><span class="w"> </span><span class="kn">import</span> <span class="n">FEATURES_V2</span><span class="p">,</span> <span class="n">NUMERIC_V2</span><span class="p">,</span> <span class="n">prepare_features_v2</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">ml_salud.entrenar</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">SEED</span><span class="p">,</span> <span class="n">calibration_bins</span><span class="p">,</span> <span class="n">encoded_preprocessor</span><span class="p">,</span> <span class="n">group_ids</span><span class="p">,</span> <span class="n">hist_preprocessor</span><span class="p">,</span>
@@ -487,11 +498,11 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">ml_salud.esquema</span><span class="w"> </span><span class="kn">import</span> <span class="n">CATEGORICAL</span><span class="p">,</span> <span class="n">DWELL_FEATURES</span><span class="p">,</span> <span class="n">HOUSE_FEATURES</span><span class="p">,</span> <span class="n">PERSON_FEATURES</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">graficos_plotly</span><span class="w"> </span><span class="kn">import</span> <span class="n">BASE</span><span class="p">,</span> <span class="n">DENTRO</span><span class="p">,</span> <span class="n">FUERA</span><span class="p">,</span> <span class="n">GRUPO_A</span><span class="p">,</span> <span class="n">GRUPO_B</span><span class="p">,</span> <span class="n">REFERENCIA</span><span class="p">,</span> <span class="n">TINTA3</span><span class="p">,</span> <span class="n">mostrar_figura</span><span class="p">,</span> <span class="n">rotular</span>
 
-<span class="n">DATOS</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"CNPV_DATOS"</span><span class="p">,</span> <span class="s2">"datos"</span><span class="p">))</span>
-<span class="n">RESULTADOS</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"ml_salud/resultados"</span><span class="p">)</span>
-<span class="n">SALIDAS_V2</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"ml_salud/experimento_contexto/salidas"</span><span class="p">)</span>
+<span class="n">DATOS</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"CNPV_DATOS"</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">PROYECTO</span> <span class="o">/</span> <span class="s2">"datos"</span><span class="p">)))</span>
+<span class="n">RESULTADOS</span> <span class="o">=</span> <span class="p">(</span><span class="n">PROYECTO</span> <span class="o">/</span> <span class="s2">"ml_salud/resultados"</span><span class="p">)</span>
+<span class="n">SALIDAS_V2</span> <span class="o">=</span> <span class="p">(</span><span class="n">PROYECTO</span> <span class="o">/</span> <span class="s2">"ml_salud/experimento_contexto/salidas"</span><span class="p">)</span>
 <span class="n">informe</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">((</span><span class="n">RESULTADOS</span> <span class="o">/</span> <span class="s2">"resultados.json"</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">))</span>
-<span class="n">informe_v1</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"ml_salud/resultados_v1/resultados.json"</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">))</span>
+<span class="n">informe_v1</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">((</span><span class="n">PROYECTO</span> <span class="o">/</span> <span class="s2">"ml_salud/resultados_v1/resultados.json"</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">))</span>
 <span class="n">decision</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">((</span><span class="n">SALIDAS_V2</span> <span class="o">/</span> <span class="s2">"decision.json"</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">))</span>
 <span class="n">brecha</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">((</span><span class="n">SALIDAS_V2</span> <span class="o">/</span> <span class="s2">"brecha.json"</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">))</span>
 
@@ -799,6 +810,7 @@
 <span class="p">),</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
     <span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span><span class="n">go</span><span class="o">.</span><span class="n">Bar</span><span class="p">(</span>
         <span class="n">x</span><span class="o">=</span><span class="n">etiquetas_x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">tabla</span><span class="p">[</span><span class="s2">"tasa"</span><span class="p">]</span> <span class="o">*</span> <span class="mi">100</span><span class="p">,</span> <span class="n">marker_color</span><span class="o">=</span><span class="n">FUERA</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mf">0.56</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">"Fuera de la ruta formal (</span><span class="si">% d</span><span class="s2">el grupo)"</span><span class="p">,</span> <span class="n">legendgroup</span><span class="o">=</span><span class="s2">"fuera"</span><span class="p">,</span> <span class="n">showlegend</span><span class="o">=</span><span class="n">columna</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span>
         <span class="n">text</span><span class="o">=</span><span class="p">[</span><span class="n">porcentaje</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">tabla</span><span class="p">[</span><span class="s2">"tasa"</span><span class="p">]],</span> <span class="n">textposition</span><span class="o">=</span><span class="s2">"outside"</span><span class="p">,</span> <span class="n">cliponaxis</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
         <span class="n">customdata</span><span class="o">=</span><span class="n">tabla</span><span class="p">[</span><span class="s2">"personas"</span><span class="p">],</span>
         <span class="n">hovertemplate</span><span class="o">=</span><span class="s2">"%</span><span class="si">{x}</span><span class="s2">&lt;br&gt;Fuera de la ruta formal: %</span><span class="si">{y:.1f}</span><span class="s2"> %&lt;br&gt;%</span><span class="si">{customdata:,}</span><span class="s2"> personas&lt;extra&gt;&lt;/extra&gt;"</span><span class="p">,</span>
@@ -807,7 +819,7 @@
 <span class="n">fig</span><span class="o">.</span><span class="n">update_xaxes</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">"category"</span><span class="p">)</span>
 <span class="n">fig</span><span class="o">.</span><span class="n">update_yaxes</span><span class="p">(</span><span class="nb">range</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">40</span><span class="p">],</span> <span class="n">ticksuffix</span><span class="o">=</span><span class="s2">" %"</span><span class="p">)</span>
 <span class="n">fig</span><span class="o">.</span><span class="n">update_yaxes</span><span class="p">(</span><span class="n">title_text</span><span class="o">=</span><span class="s2">"Fuera de la ruta formal"</span><span class="p">,</span> <span class="n">row</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span><span class="n">showlegend</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span><span class="n">showlegend</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">rotular</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="s2">"La clase crece cuando otras personas declaran un problema de salud"</span><span class="p">)</span>
 <span class="n">mostrar_figura</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="n">alto</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span> <span class="n">ancho</span><span class="o">=</span><span class="mi">940</span><span class="p">)</span>
 
@@ -824,7 +836,7 @@
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="figura-interactiva" data-datos="datos-1f60b78a97de"></div><script type="application/json" id="datos-1f60b78a97de">{"config": {"displayModeBar": false, "responsive": true}, "data": [{"cliponaxis": false, "customdata": {"bdata": "R+8AABmYAACkTgAAXj0AAA==", "dtype": "i4"}, "hovertemplate": "%{x}<br>Fuera de la ruta formal: %{y:.1f} %<br>%{customdata:,} personas<extra><\/extra>", "marker": {"color": "#DD6B20"}, "text": ["15,7 %", "21,6 %", "26,4 %", "33,5 %"], "textposition": "outside", "type": "bar", "width": 0.56, "x": ["0", "1", "2", "3 o más"], "xaxis": "x", "y": {"bdata": "cGceQ5x+L0DloKhQNKM1QDUSCqoJcjpA80OVpJq5QEA=", "dtype": "f8"}, "yaxis": "y"}, {"cliponaxis": false, "customdata": {"bdata": "R2pHaklqTWo+ag==", "dtype": "i2"}, "hovertemplate": "%{x}<br>Fuera de la ruta formal: %{y:.1f} %<br>%{customdata:,} personas<extra><\/extra>", "marker": {"color": "#DD6B20"}, "text": ["17,8 %", "18,8 %", "21,2 %", "20,5 %", "27,0 %"], "textposition": "outside", "type": "bar", "width": 0.56, "x": ["Q1", "Q2", "Q3", "Q4", "Q5"], "xaxis": "x2", "y": {"bdata": "3fZcWKfBMUBoyQUfacQyQNj3SuDZMzVAE0B5w6mKNEBdHu206wk7QA==", "dtype": "f8"}, "yaxis": "y2"}], "layout": {"annotations": [{"font": {"size": 16}, "showarrow": false, "text": "Hogar", "x": 0.23, "xanchor": "center", "xref": "paper", "y": 1.0, "yanchor": "bottom", "yref": "paper"}, {"font": {"size": 16}, "showarrow": false, "text": "Sección censal", "x": 0.77, "xanchor": "center", "xref": "paper", "y": 1.0, "yanchor": "bottom", "yref": "paper"}], "height": 400, "showlegend": false, "template": {"layout": {"colorway": ["#1B6CA8", "#DD6B20", "#5B6FB5", "#A86C00"], "font": {"color": "#3A4F60", "family": "Atkinson Hyperlegible Next, Segoe UI, Arial, sans-serif", "size": 13}, "hoverlabel": {"align": "left", "bgcolor": "#10293B", "bordercolor": "#10293B", "font": {"color": "#FFFFFF", "family": "Atkinson Hyperlegible Next, Segoe UI, Arial, sans-serif", "size": 13}}, "legend": {"font": {"color": "#3A4F60"}, "orientation": "h", "x": 0, "xanchor": "left", "y": 1.0, "yanchor": "bottom"}, "margin": {"b": 56, "l": 10, "r": 24, "t": 84}, "paper_bgcolor": "rgba(0,0,0,0)", "plot_bgcolor": "rgba(0,0,0,0)", "separators": ",.", "xaxis": {"automargin": true, "gridcolor": "#D9E1E7", "linecolor": "#A9B6C1", "tickcolor": "#A9B6C1", "title": {"font": {"color": "#54697A", "size": 13}}, "zeroline": false}, "yaxis": {"automargin": true, "gridcolor": "#D9E1E7", "linecolor": "#A9B6C1", "tickcolor": "#A9B6C1", "title": {"font": {"color": "#54697A", "size": 13}}, "zeroline": false}}}, "title": {"font": {"color": "#10293B", "size": 17}, "pad": {"t": 12}, "subtitle": {"font": {"color": "#54697A", "size": 13}, "text": ""}, "text": "La clase crece cuando otras personas declaran un problema de salud", "x": 0, "xanchor": "left", "xref": "paper", "y": 1, "yanchor": "top", "yref": "container"}, "xaxis": {"anchor": "y", "domain": [0.0, 0.46], "showgrid": false, "title": {"text": "Otras personas del hogar con problema de salud"}, "type": "category"}, "xaxis2": {"anchor": "y2", "domain": [0.54, 1.0], "showgrid": false, "title": {"text": "Quintil de la proporción en la sección censal"}, "type": "category"}, "yaxis": {"anchor": "x", "domain": [0.0, 1.0], "range": [0, 40], "ticksuffix": " %", "title": {"text": "Fuera de la ruta formal"}}, "yaxis2": {"anchor": "x2", "domain": [0.0, 1.0], "matches": "y", "range": [0, 40], "showticklabels": false, "ticksuffix": " %"}}}</script><noscript><img alt="_images/1f60b78a97def5f8cf52fa37d3f35805b784dd0d0895c7487041b4ff92959d50.png" src="_images/1f60b78a97def5f8cf52fa37d3f35805b784dd0d0895c7487041b4ff92959d50.png" /></noscript>
+<div class="figura-interactiva" data-datos="datos-645a0d8a1add"></div><script type="application/json" id="datos-645a0d8a1add">{"config": {"displayModeBar": false, "responsive": true}, "data": [{"cliponaxis": false, "customdata": {"bdata": "R+8AABmYAACkTgAAXj0AAA==", "dtype": "i4"}, "hovertemplate": "%{x}<br>Fuera de la ruta formal: %{y:.1f} %<br>%{customdata:,} personas<extra><\/extra>", "legendgroup": "fuera", "marker": {"color": "#DD6B20"}, "name": "Fuera de la ruta formal (% del grupo)", "showlegend": true, "text": ["15,7 %", "21,6 %", "26,4 %", "33,5 %"], "textposition": "outside", "type": "bar", "width": 0.56, "x": ["0", "1", "2", "3 o más"], "xaxis": "x", "y": {"bdata": "cGceQ5x+L0DloKhQNKM1QDUSCqoJcjpA80OVpJq5QEA=", "dtype": "f8"}, "yaxis": "y"}, {"cliponaxis": false, "customdata": {"bdata": "R2pHaklqTWo+ag==", "dtype": "i2"}, "hovertemplate": "%{x}<br>Fuera de la ruta formal: %{y:.1f} %<br>%{customdata:,} personas<extra><\/extra>", "legendgroup": "fuera", "marker": {"color": "#DD6B20"}, "name": "Fuera de la ruta formal (% del grupo)", "showlegend": false, "text": ["17,8 %", "18,8 %", "21,2 %", "20,5 %", "27,0 %"], "textposition": "outside", "type": "bar", "width": 0.56, "x": ["Q1", "Q2", "Q3", "Q4", "Q5"], "xaxis": "x2", "y": {"bdata": "3fZcWKfBMUBoyQUfacQyQNj3SuDZMzVAE0B5w6mKNEBdHu206wk7QA==", "dtype": "f8"}, "yaxis": "y2"}], "layout": {"annotations": [{"font": {"size": 16}, "showarrow": false, "text": "Hogar", "x": 0.23, "xanchor": "center", "xref": "paper", "y": 1.0, "yanchor": "bottom", "yref": "paper"}, {"font": {"size": 16}, "showarrow": false, "text": "Sección censal", "x": 0.77, "xanchor": "center", "xref": "paper", "y": 1.0, "yanchor": "bottom", "yref": "paper"}], "height": 400, "showlegend": true, "template": {"layout": {"colorway": ["#1B6CA8", "#DD6B20", "#5B6FB5", "#A86C00"], "font": {"color": "#3A4F60", "family": "Atkinson Hyperlegible Next, Segoe UI, Arial, sans-serif", "size": 13}, "hoverlabel": {"align": "left", "bgcolor": "#10293B", "bordercolor": "#10293B", "font": {"color": "#FFFFFF", "family": "Atkinson Hyperlegible Next, Segoe UI, Arial, sans-serif", "size": 13}}, "legend": {"font": {"color": "#3A4F60"}, "orientation": "h", "x": 0, "xanchor": "left", "y": 1.0, "yanchor": "bottom"}, "margin": {"b": 56, "l": 10, "r": 24, "t": 84}, "paper_bgcolor": "rgba(0,0,0,0)", "plot_bgcolor": "rgba(0,0,0,0)", "separators": ",.", "xaxis": {"automargin": true, "gridcolor": "#D9E1E7", "linecolor": "#A9B6C1", "tickcolor": "#A9B6C1", "title": {"font": {"color": "#54697A", "size": 13}}, "zeroline": false}, "yaxis": {"automargin": true, "gridcolor": "#D9E1E7", "linecolor": "#A9B6C1", "tickcolor": "#A9B6C1", "title": {"font": {"color": "#54697A", "size": 13}}, "zeroline": false}}}, "title": {"font": {"color": "#10293B", "size": 17}, "pad": {"t": 12}, "subtitle": {"font": {"color": "#54697A", "size": 13}, "text": ""}, "text": "La clase crece cuando otras personas declaran un problema de salud", "x": 0, "xanchor": "left", "xref": "paper", "y": 1, "yanchor": "top", "yref": "container"}, "xaxis": {"anchor": "y", "domain": [0.0, 0.46], "showgrid": false, "title": {"text": "Otras personas del hogar con problema de salud"}, "type": "category"}, "xaxis2": {"anchor": "y2", "domain": [0.54, 1.0], "showgrid": false, "title": {"text": "Quintil de la proporción en la sección censal"}, "type": "category"}, "yaxis": {"anchor": "x", "domain": [0.0, 1.0], "range": [0, 40], "ticksuffix": " %", "title": {"text": "Fuera de la ruta formal"}}, "yaxis2": {"anchor": "x2", "domain": [0.0, 1.0], "matches": "y", "range": [0, 40], "showticklabels": false, "ticksuffix": " %"}}}</script><noscript><img alt="_images/645a0d8a1add39ba819cb8134aa3af01efb853e17f0976324e7e032715a9a38f.png" src="_images/645a0d8a1add39ba819cb8134aa3af01efb853e17f0976324e7e032715a9a38f.png" /></noscript>
 <div class="output text_html"><p style='margin:1em 0 .4em'>Acción principal según las otras personas del hogar con problema de salud</p></div><div class="output text_html"><table class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -924,7 +936,7 @@
 </section>
 <section id="particiones-y-preprocesamiento">
 <h2>4. Particiones y preprocesamiento<a class="headerlink" href="#particiones-y-preprocesamiento" title="Link to this heading">#</a></h2>
-<p>La cohorte se divide en entrenamiento, validación y prueba con estratificación por clase y agrupación por vivienda: las personas de una misma vivienda quedan en una sola partición. Así, el modelo no se evalúa con casi las mismas condiciones del hogar que vio al ajustarse. <code class="docutils literal notranslate"><span class="pre">split_three</span></code> se detiene si alguna vivienda aparece en dos particiones.</p>
+<p>La cohorte se divide en entrenamiento, validación y prueba con estratificación por clase y agrupación por vivienda: las personas de una misma vivienda quedan en una sola partición. Así, el modelo no se evalúa con casi las mismas condiciones del hogar que vio al ajustarse. <code class="docutils literal notranslate"><span class="pre">split_three</span></code> reparte la cohorte en siete grupos iguales con <code class="docutils literal notranslate"><span class="pre">StratifiedGroupKFold</span></code> (semilla 42): cinco forman el entrenamiento (≈ 71,4 %), uno la validación (≈ 14,3 %) y uno la prueba (≈ 14,3 %). Se detiene si alguna vivienda aparece en dos particiones.</p>
 <ul class="simple">
 <li><p>Entrenamiento: ajustar los modelos y buscar parámetros con validación cruzada de tres pliegues, también agrupada por vivienda.</p></li>
 <li><p>Validación: elegir el modelo y el umbral.</p></li>
@@ -938,7 +950,8 @@
 <span class="n">train</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">test</span> <span class="o">=</span> <span class="n">split_three</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">viviendas</span><span class="p">)</span>
 
 <span class="n">ver</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([</span>
-    <span class="p">{</span><span class="s2">"Partición"</span><span class="p">:</span> <span class="n">nombre</span><span class="p">,</span> <span class="s2">"Personas"</span><span class="p">:</span> <span class="n">entero</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">i</span><span class="p">)),</span> <span class="s2">"Viviendas"</span><span class="p">:</span> <span class="n">entero</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">viviendas</span><span class="p">[</span><span class="n">i</span><span class="p">]))),</span>
+    <span class="p">{</span><span class="s2">"Partición"</span><span class="p">:</span> <span class="n">nombre</span><span class="p">,</span> <span class="s2">"Personas"</span><span class="p">:</span> <span class="n">entero</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">i</span><span class="p">)),</span> <span class="s2">"Porcentaje de la cohorte"</span><span class="p">:</span> <span class="n">porcentaje</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">y</span><span class="p">)),</span>
+     <span class="s2">"Viviendas"</span><span class="p">:</span> <span class="n">entero</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">viviendas</span><span class="p">[</span><span class="n">i</span><span class="p">]))),</span>
      <span class="s2">"Fuera de la ruta formal"</span><span class="p">:</span> <span class="n">entero</span><span class="p">(</span><span class="n">y</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()),</span> <span class="s2">"Prevalencia"</span><span class="p">:</span> <span class="n">porcentaje</span><span class="p">(</span><span class="n">y</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span> <span class="mi">2</span><span class="p">)}</span>
     <span class="k">for</span> <span class="n">nombre</span><span class="p">,</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">((</span><span class="s2">"Entrenamiento"</span><span class="p">,</span> <span class="n">train</span><span class="p">),</span> <span class="p">(</span><span class="s2">"Validación"</span><span class="p">,</span> <span class="n">val</span><span class="p">),</span> <span class="p">(</span><span class="s2">"Prueba"</span><span class="p">,</span> <span class="n">test</span><span class="p">))</span>
 <span class="p">]))</span>
@@ -955,6 +968,7 @@
     <tr style="text-align: right;">
       <th>Partición</th>
       <th>Personas</th>
+      <th>Porcentaje de la cohorte</th>
       <th>Viviendas</th>
       <th>Fuera de la ruta formal</th>
       <th>Prevalencia</th>
@@ -964,6 +978,7 @@
     <tr>
       <td>Entrenamiento</td>
       <td>97.167</td>
+      <td>71,4 %</td>
       <td>63.927</td>
       <td>20.465</td>
       <td>21,06 %</td>
@@ -971,6 +986,7 @@
     <tr>
       <td>Validación</td>
       <td>19.433</td>
+      <td>14,3 %</td>
       <td>12.718</td>
       <td>4.092</td>
       <td>21,06 %</td>
@@ -978,6 +994,7 @@
     <tr>
       <td>Prueba</td>
       <td>19.434</td>
+      <td>14,3 %</td>
       <td>12.695</td>
       <td>4.093</td>
       <td>21,06 %</td>
@@ -1154,6 +1171,100 @@
 </table></div></div>
 </div>
 <p>Gana el boosting de histogramas, con 15 hojas, tasa 0,04 y 500 iteraciones. Trata municipio, sexo y las demás variables nominales como categorías, no como cantidades, y no usa parada temprana para no crear otra partición de datos.</p>
+<section id="por-que-escogimos-el-boosting-de-histogramas">
+<h3>¿Por qué escogimos el boosting de histogramas?<a class="headerlink" href="#por-que-escogimos-el-boosting-de-histogramas" title="Link to this heading">#</a></h3>
+<p>La regla de elección se fijó antes de mirar la prueba: gana el candidato con mayor precisión promedio (AP) en <strong>validación</strong>. La celda siguiente la aplica y añade las demás métricas para comprobar que la elección no depende de una sola cifra. Las razones:</p>
+<ol class="arabic simple">
+<li><p><strong>Gana con la regla fijada de antemano</strong>: tiene la mayor AP en validación cruzada y en validación.</p></li>
+<li><p><strong>Gana también en ROC-AUC y Brier</strong>: ordena mejor y sus probabilidades se equivocan menos.</p></li>
+<li><p><strong>La ventaja es pequeña, pero distinta de cero</strong>: el intervalo pareado del 95 % de la diferencia de AP frente al segundo modelo (bootstrap que remuestrea viviendas completas) no incluye cero. Ese intervalo se calcula con los modelos ya entrenados: no cubre la variabilidad del entrenamiento ni de la selección.</p></li>
+<li><p><strong>Se ajusta a estos datos</strong>: trata municipio, sexo y materiales como categorías y aprende combinaciones entre variables sin escribirlas a mano. La regresión logística, más sencilla, queda cerca; la mejora del boosting es real pero modesta.</p></li>
+</ol>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">eleccion</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([{</span><span class="s2">"codigo"</span><span class="p">:</span> <span class="n">n</span><span class="p">,</span> <span class="s2">"Modelo"</span><span class="p">:</span> <span class="n">NOMBRES</span><span class="p">[</span><span class="n">n</span><span class="p">],</span>
+                          <span class="s2">"AP validación cruzada"</span><span class="p">:</span> <span class="n">informe</span><span class="p">[</span><span class="s2">"models"</span><span class="p">][</span><span class="n">n</span><span class="p">][</span><span class="s2">"cv_pr_auc"</span><span class="p">],</span>
+                          <span class="s2">"AP validación"</span><span class="p">:</span> <span class="n">average_precision_score</span><span class="p">(</span><span class="n">y</span><span class="p">[</span><span class="n">val</span><span class="p">],</span> <span class="n">val_scores</span><span class="p">[</span><span class="n">n</span><span class="p">]),</span>
+                          <span class="s2">"ROC-AUC validación"</span><span class="p">:</span> <span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y</span><span class="p">[</span><span class="n">val</span><span class="p">],</span> <span class="n">val_scores</span><span class="p">[</span><span class="n">n</span><span class="p">]),</span>
+                          <span class="s2">"Brier validación"</span><span class="p">:</span> <span class="n">brier_score_loss</span><span class="p">(</span><span class="n">y</span><span class="p">[</span><span class="n">val</span><span class="p">],</span> <span class="n">val_scores</span><span class="p">[</span><span class="n">n</span><span class="p">])}</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">NOMBRES</span><span class="p">])</span>
+<span class="n">eleccion</span> <span class="o">=</span> <span class="n">eleccion</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">"AP validación"</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">eleccion</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">"Puesto"</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">eleccion</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+<span class="n">ganador</span> <span class="o">=</span> <span class="n">eleccion</span><span class="p">[</span><span class="s2">"codigo"</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="k">assert</span> <span class="n">ganador</span> <span class="o">==</span> <span class="n">informe</span><span class="p">[</span><span class="s2">"selected_model"</span><span class="p">],</span> <span class="s2">"La regla de validación no reproduce la elección guardada"</span>
+
+<span class="n">delta</span> <span class="o">=</span> <span class="n">informe</span><span class="p">[</span><span class="s2">"test_uncertainty"</span><span class="p">][</span><span class="s2">"intervals_95"</span><span class="p">][</span><span class="s2">"delta_ap_vs_competitor"</span><span class="p">]</span>
+<span class="n">rival</span> <span class="o">=</span> <span class="n">informe</span><span class="p">[</span><span class="s2">"test_uncertainty"</span><span class="p">][</span><span class="s2">"competitor"</span><span class="p">]</span>
+<span class="n">metricas_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">eleccion</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s2">"AP"</span><span class="p">,</span> <span class="s2">"ROC"</span><span class="p">,</span> <span class="s2">"Brier"</span><span class="p">))]</span>
+<span class="n">ver</span><span class="p">(</span><span class="n">eleccion</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="s2">"codigo"</span><span class="p">)</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="n">c</span><span class="p">:</span> <span class="n">eleccion</span><span class="p">[</span><span class="n">c</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">decimal</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">metricas_cols</span><span class="p">}),</span>
+    <span class="s2">"Regla de elección: mayor AP en validación (la prueba no interviene)"</span><span class="p">)</span>
+<span class="n">ver</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([{</span><span class="s2">"Comparación"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">NOMBRES</span><span class="p">[</span><span class="n">ganador</span><span class="p">]</span><span class="si">}</span><span class="s2"> menos </span><span class="si">{</span><span class="n">NOMBRES</span><span class="p">[</span><span class="n">rival</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+                   <span class="s2">"Diferencia de AP en prueba"</span><span class="p">:</span> <span class="n">decimal</span><span class="p">(</span><span class="n">informe</span><span class="p">[</span><span class="s2">"test_metrics"</span><span class="p">][</span><span class="n">ganador</span><span class="p">][</span><span class="s2">"pr_auc"</span><span class="p">]</span> <span class="o">-</span> <span class="n">informe</span><span class="p">[</span><span class="s2">"test_metrics"</span><span class="p">][</span><span class="n">rival</span><span class="p">][</span><span class="s2">"pr_auc"</span><span class="p">]),</span>
+                   <span class="s2">"IC 95 </span><span class="si">% i</span><span class="s2">nferior"</span><span class="p">:</span> <span class="n">decimal</span><span class="p">(</span><span class="n">delta</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="s2">"IC 95 </span><span class="si">% s</span><span class="s2">uperior"</span><span class="p">:</span> <span class="n">decimal</span><span class="p">(</span><span class="n">delta</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+                   <span class="s2">"Método"</span><span class="p">:</span> <span class="s2">"Bootstrap pareado, 250 remuestreos de viviendas"</span><span class="p">}]),</span>
+    <span class="s2">"Tamaño de la ventaja frente al segundo modelo en prueba"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><p style='margin:1em 0 .4em'>Regla de elección: mayor AP en validación (la prueba no interviene)</p></div><div class="output text_html"><table class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Puesto</th>
+      <th>Modelo</th>
+      <th>AP validación cruzada</th>
+      <th>AP validación</th>
+      <th>ROC-AUC validación</th>
+      <th>Brier validación</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td>Boosting de histogramas</td>
+      <td>0,374</td>
+      <td>0,386</td>
+      <td>0,701</td>
+      <td>0,151</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>Bosque aleatorio</td>
+      <td>0,363</td>
+      <td>0,370</td>
+      <td>0,688</td>
+      <td>0,154</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>Regresión logística</td>
+      <td>0,359</td>
+      <td>0,369</td>
+      <td>0,686</td>
+      <td>0,154</td>
+    </tr>
+  </tbody>
+</table></div><div class="output text_html"><p style='margin:1em 0 .4em'>Tamaño de la ventaja frente al segundo modelo en prueba</p></div><div class="output text_html"><table class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Comparación</th>
+      <th>Diferencia de AP en prueba</th>
+      <th>IC 95 % inferior</th>
+      <th>IC 95 % superior</th>
+      <th>Método</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Boosting de histogramas menos Bosque aleatorio</td>
+      <td>0,012</td>
+      <td>0,005</td>
+      <td>0,020</td>
+      <td>Bootstrap pareado, 250 remuestreos de viviendas</td>
+    </tr>
+  </tbody>
+</table></div></div>
+</div>
+</section>
 </section>
 <section id="por-que-existe-una-version-2">
 <h2>6. Por qué existe una versión 2<a class="headerlink" href="#por-que-existe-una-version-2" title="Link to this heading">#</a></h2>
@@ -1417,6 +1528,112 @@
   </tbody>
 </table></div></div>
 </div>
+<section id="por-que-las-metricas-se-ven-bajas-el-modelo-predice">
+<h3>¿Por qué las métricas se ven bajas? ¿El modelo predice?<a class="headerlink" href="#por-que-las-metricas-se-ven-bajas-el-modelo-predice" title="Link to this heading">#</a></h3>
+<p>Sí predice, pero hay que leerlo con la métrica adecuada. La tabla siguiente compara tres escenarios en la prueba:</p>
+<ul class="simple">
+<li><p><strong>Siempre «dentro de la ruta»</strong>: no usa modelo y tiene la exactitud más alta, porque cuatro de cada cinco personas están dentro. Nunca encuentra un caso. Por eso la exactitud no sirve para elegir.</p></li>
+<li><p><strong>Modelo con el corte convencional de 0,5</strong>: como la clase es minoritaria y las probabilidades están calibradas, rara vez pasan de 0,5; el modelo casi no marca a nadie.</p></li>
+<li><p><strong>Modelo con el umbral elegido en validación (F1)</strong>: detecta la mayoría de los casos a cambio de falsas alarmas.</p></li>
+</ul>
+<p>La última tabla muestra que el modelo sí ordena: entre las puntuaciones más altas, la proporción de casos es más del doble de la prevalencia (<em>lift</em>). El límite está en los datos: el censo no registra la gravedad del problema, el tiempo de espera, la distancia ni las preferencias, que deciden buena parte de la acción declarada.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">escenario</span><span class="p">(</span><span class="n">nombre</span><span class="p">,</span> <span class="n">pred</span><span class="p">):</span>
+    <span class="n">tn</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(((</span><span class="n">pred</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">yt</span> <span class="o">==</span> <span class="mi">0</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+    <span class="n">fp</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(((</span><span class="n">pred</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">yt</span> <span class="o">==</span> <span class="mi">0</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+    <span class="n">fn</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(((</span><span class="n">pred</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">yt</span> <span class="o">==</span> <span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+    <span class="n">tp</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(((</span><span class="n">pred</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">yt</span> <span class="o">==</span> <span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+    <span class="n">sens</span><span class="p">,</span> <span class="n">espec</span> <span class="o">=</span> <span class="n">tp</span> <span class="o">/</span> <span class="p">(</span><span class="n">tp</span> <span class="o">+</span> <span class="n">fn</span><span class="p">),</span> <span class="n">tn</span> <span class="o">/</span> <span class="p">(</span><span class="n">tn</span> <span class="o">+</span> <span class="n">fp</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"Escenario"</span><span class="p">:</span> <span class="n">nombre</span><span class="p">,</span> <span class="s2">"Exactitud"</span><span class="p">:</span> <span class="n">porcentaje</span><span class="p">((</span><span class="n">tn</span> <span class="o">+</span> <span class="n">tp</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">yt</span><span class="p">)),</span> <span class="s2">"Exactitud balanceada"</span><span class="p">:</span> <span class="n">porcentaje</span><span class="p">((</span><span class="n">sens</span> <span class="o">+</span> <span class="n">espec</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span><span class="p">),</span>
+            <span class="s2">"Sensibilidad"</span><span class="p">:</span> <span class="n">porcentaje</span><span class="p">(</span><span class="n">sens</span><span class="p">),</span> <span class="s2">"Precisión"</span><span class="p">:</span> <span class="n">porcentaje</span><span class="p">(</span><span class="n">tp</span> <span class="o">/</span> <span class="p">(</span><span class="n">tp</span> <span class="o">+</span> <span class="n">fp</span><span class="p">))</span> <span class="k">if</span> <span class="n">tp</span> <span class="o">+</span> <span class="n">fp</span> <span class="k">else</span> <span class="s2">"—"</span><span class="p">,</span> <span class="s2">"Marcadas"</span><span class="p">:</span> <span class="n">entero</span><span class="p">(</span><span class="n">tp</span> <span class="o">+</span> <span class="n">fp</span><span class="p">)}</span>
+
+
+<span class="n">umbral_final</span> <span class="o">=</span> <span class="n">informe</span><span class="p">[</span><span class="s2">"threshold_from_validation"</span><span class="p">]</span>
+<span class="n">ver</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([</span><span class="n">escenario</span><span class="p">(</span><span class="s2">"Siempre «dentro» (sin modelo)"</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">yt</span><span class="p">)),</span>
+                  <span class="n">escenario</span><span class="p">(</span><span class="s2">"Modelo con umbral 0,5"</span><span class="p">,</span> <span class="p">(</span><span class="n">s</span> <span class="o">&gt;=</span> <span class="mf">0.5</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)),</span>
+                  <span class="n">escenario</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Modelo con umbral validado (</span><span class="si">{</span><span class="n">decimal</span><span class="p">(</span><span class="n">umbral_final</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span><span class="p">,</span> <span class="p">(</span><span class="n">s</span> <span class="o">&gt;=</span> <span class="n">umbral_final</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">))]),</span>
+    <span class="s2">"Por qué la exactitud engaña: tres escenarios en la prueba"</span><span class="p">)</span>
+<span class="n">ver</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([{</span><span class="s2">"Se revisa"</span><span class="p">:</span> <span class="n">porcentaje</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s2">"fraction"</span><span class="p">],</span> <span class="mi">0</span><span class="p">),</span> <span class="s2">"Personas"</span><span class="p">:</span> <span class="n">entero</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s2">"reviewed"</span><span class="p">]),</span> <span class="s2">"Fuera de la ruta"</span><span class="p">:</span> <span class="n">entero</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s2">"positives_found"</span><span class="p">]),</span>
+                   <span class="s2">"Precisión"</span><span class="p">:</span> <span class="n">porcentaje</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s2">"precision"</span><span class="p">]),</span> <span class="s2">"Lift sobre la prevalencia"</span><span class="p">:</span> <span class="n">decimal</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s2">"lift"</span><span class="p">],</span> <span class="mi">2</span><span class="p">)}</span>
+                  <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">priorizacion</span><span class="p">(</span><span class="n">yt</span><span class="p">,</span> <span class="n">s</span><span class="p">)]),</span>
+    <span class="sa">f</span><span class="s2">"El modelo sí ordena: precisión entre las puntuaciones más altas (prevalencia </span><span class="si">{</span><span class="n">porcentaje</span><span class="p">(</span><span class="n">yt</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><p style='margin:1em 0 .4em'>Por qué la exactitud engaña: tres escenarios en la prueba</p></div><div class="output text_html"><table class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Escenario</th>
+      <th>Exactitud</th>
+      <th>Exactitud balanceada</th>
+      <th>Sensibilidad</th>
+      <th>Precisión</th>
+      <th>Marcadas</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Siempre «dentro» (sin modelo)</td>
+      <td>78,9 %</td>
+      <td>50,0 %</td>
+      <td>0,0 %</td>
+      <td>—</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <td>Modelo con umbral 0,5</td>
+      <td>79,1 %</td>
+      <td>52,0 %</td>
+      <td>5,2 %</td>
+      <td>55,0 %</td>
+      <td>389</td>
+    </tr>
+    <tr>
+      <td>Modelo con umbral validado (0,2235)</td>
+      <td>65,9 %</td>
+      <td>63,9 %</td>
+      <td>60,6 %</td>
+      <td>33,1 %</td>
+      <td>7.497</td>
+    </tr>
+  </tbody>
+</table></div><div class="output text_html"><p style='margin:1em 0 .4em'>El modelo sí ordena: precisión entre las puntuaciones más altas (prevalencia 21,1 %)</p></div><div class="output text_html"><table class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Se revisa</th>
+      <th>Personas</th>
+      <th>Fuera de la ruta</th>
+      <th>Precisión</th>
+      <th>Lift sobre la prevalencia</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>5 %</td>
+      <td>972</td>
+      <td>493</td>
+      <td>50,7 %</td>
+      <td>2,41</td>
+    </tr>
+    <tr>
+      <td>10 %</td>
+      <td>1.944</td>
+      <td>906</td>
+      <td>46,6 %</td>
+      <td>2,21</td>
+    </tr>
+    <tr>
+      <td>20 %</td>
+      <td>3.887</td>
+      <td>1.561</td>
+      <td>40,2 %</td>
+      <td>1,91</td>
+    </tr>
+  </tbody>
+</table></div></div>
+</div>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fpr</span><span class="p">,</span> <span class="n">tpr</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">roc_curve</span><span class="p">(</span><span class="n">yt</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
@@ -1454,6 +1671,7 @@
 </div>
 </div>
 <p>Cómo leerlo. El modelo ordena mejor que el azar y que la prevalencia, pero la discriminación es moderada: ROC-AUC de 0,696. La precisión más alta aparece solo entre las puntuaciones superiores y cae pronto.</p>
+</section>
 <section id="calibracion">
 <h3>Calibración<a class="headerlink" href="#calibracion" title="Link to this heading">#</a></h3>
 <p>Una probabilidad está bien calibrada si, entre quienes reciben cerca de 30 %, cerca del 30 % pertenece a la clase.</p>
@@ -1640,21 +1858,27 @@
 <span class="p">}</span>
 <span class="n">importancia</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">informe</span><span class="p">[</span><span class="s2">"permutation_importance_validation"</span><span class="p">])</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span><span class="o">.</span><span class="n">iloc</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
 <span class="n">nuevas</span> <span class="o">=</span> <span class="n">importancia</span><span class="p">[</span><span class="s2">"feature"</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">([</span><span class="s2">"HOGAR_OTROS_ENFERMOS"</span><span class="p">,</span> <span class="s2">"SECCION_PCT_ENFERMOS"</span><span class="p">])</span>
-<span class="n">fig</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Figure</span><span class="p">(</span><span class="n">go</span><span class="o">.</span><span class="n">Bar</span><span class="p">(</span>
-    <span class="n">x</span><span class="o">=</span><span class="n">importancia</span><span class="p">[</span><span class="s2">"mean_ap_drop"</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="n">NOMBRES_VAR</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">importancia</span><span class="p">[</span><span class="s2">"feature"</span><span class="p">]],</span> <span class="n">orientation</span><span class="o">=</span><span class="s2">"h"</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span>
-    <span class="n">marker_color</span><span class="o">=</span><span class="p">[</span><span class="n">DENTRO</span> <span class="k">if</span> <span class="n">n</span> <span class="k">else</span> <span class="n">BASE</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">nuevas</span><span class="p">],</span> <span class="n">text</span><span class="o">=</span><span class="p">[</span><span class="n">decimal</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">importancia</span><span class="p">[</span><span class="s2">"mean_ap_drop"</span><span class="p">]],</span>
-    <span class="n">textposition</span><span class="o">=</span><span class="s2">"outside"</span><span class="p">,</span> <span class="n">cliponaxis</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">customdata</span><span class="o">=</span><span class="n">importancia</span><span class="p">[</span><span class="s2">"std_ap_drop"</span><span class="p">],</span>
-    <span class="n">hovertemplate</span><span class="o">=</span><span class="s2">"%</span><span class="si">{y}</span><span class="s2">&lt;br&gt;Caída media de AP: %</span><span class="si">{x:.4f}</span><span class="s2">&lt;br&gt;Desviación: %</span><span class="si">{customdata:.4f}</span><span class="s2">&lt;extra&gt;&lt;/extra&gt;"</span><span class="p">,</span>
-<span class="p">))</span>
+<span class="n">orden</span> <span class="o">=</span> <span class="p">[</span><span class="n">NOMBRES_VAR</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">importancia</span><span class="p">[</span><span class="s2">"feature"</span><span class="p">]]</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Figure</span><span class="p">()</span>
+<span class="k">for</span> <span class="n">es_nueva</span><span class="p">,</span> <span class="n">nombre</span><span class="p">,</span> <span class="n">color</span> <span class="ow">in</span> <span class="p">((</span><span class="kc">False</span><span class="p">,</span> <span class="s2">"Variables de la versión 1"</span><span class="p">,</span> <span class="n">BASE</span><span class="p">),</span> <span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="s2">"Variables de contexto añadidas (versión 2)"</span><span class="p">,</span> <span class="n">DENTRO</span><span class="p">)):</span>
+    <span class="n">parte</span> <span class="o">=</span> <span class="n">importancia</span><span class="p">[</span><span class="n">nuevas</span> <span class="o">==</span> <span class="n">es_nueva</span><span class="p">]</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">add_trace</span><span class="p">(</span><span class="n">go</span><span class="o">.</span><span class="n">Bar</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">parte</span><span class="p">[</span><span class="s2">"mean_ap_drop"</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="n">NOMBRES_VAR</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">parte</span><span class="p">[</span><span class="s2">"feature"</span><span class="p">]],</span> <span class="n">orientation</span><span class="o">=</span><span class="s2">"h"</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">nombre</span><span class="p">,</span> <span class="n">marker_color</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="p">[</span><span class="n">decimal</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">parte</span><span class="p">[</span><span class="s2">"mean_ap_drop"</span><span class="p">]],</span>
+        <span class="n">textposition</span><span class="o">=</span><span class="s2">"outside"</span><span class="p">,</span> <span class="n">cliponaxis</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">customdata</span><span class="o">=</span><span class="n">parte</span><span class="p">[</span><span class="s2">"std_ap_drop"</span><span class="p">],</span>
+        <span class="n">hovertemplate</span><span class="o">=</span><span class="s2">"%</span><span class="si">{y}</span><span class="s2">&lt;br&gt;Caída media de AP: %</span><span class="si">{x:.4f}</span><span class="s2">&lt;br&gt;Desviación: %</span><span class="si">{customdata:.4f}</span><span class="s2">&lt;extra&gt;&lt;/extra&gt;"</span><span class="p">,</span>
+    <span class="p">))</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span><span class="n">showlegend</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">update_yaxes</span><span class="p">(</span><span class="n">categoryorder</span><span class="o">=</span><span class="s2">"array"</span><span class="p">,</span> <span class="n">categoryarray</span><span class="o">=</span><span class="n">orden</span><span class="p">)</span>
 <span class="n">fig</span><span class="o">.</span><span class="n">update_xaxes</span><span class="p">(</span><span class="nb">range</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">importancia</span><span class="p">[</span><span class="s2">"mean_ap_drop"</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">*</span> <span class="mf">1.18</span><span class="p">],</span> <span class="n">title_text</span><span class="o">=</span><span class="s2">"Caída media de AP en validación"</span><span class="p">)</span>
 <span class="n">fig</span><span class="o">.</span><span class="n">update_yaxes</span><span class="p">(</span><span class="n">showgrid</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-<span class="n">rotular</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="s2">"Las ocho variables con mayor importancia por permutación"</span><span class="p">,</span> <span class="s2">"En azul, las dos variables añadidas"</span><span class="p">)</span>
+<span class="n">rotular</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="s2">"Las ocho variables con mayor importancia por permutación"</span><span class="p">,</span> <span class="s2">"Color según la versión en que entró la variable"</span><span class="p">)</span>
 <span class="n">mostrar_figura</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="n">alto</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="figura-interactiva" data-datos="datos-5131dd77339c"></div><script type="application/json" id="datos-5131dd77339c">{"config": {"displayModeBar": false, "responsive": true}, "data": [{"cliponaxis": false, "customdata": {"bdata": "8ri8+HOAOD9qAeq9bkVLPxSn3lESqkI/yO/Sy9KkWj8QjVZGUgdePx1jMaYFiFE/AV3+PaN/Tj9pl/05wUFhPw==", "dtype": "f8"}, "hovertemplate": "%{y}<br>Caída media de AP: %{x:.4f}<br>Desviación: %{customdata:.4f}<extra><\/extra>", "marker": {"color": ["#A9B6C1", "#A9B6C1", "#A9B6C1", "#A9B6C1", "#1B6CA8", "#A9B6C1", "#1B6CA8", "#A9B6C1"]}, "orientation": "h", "text": ["0,007", "0,009", "0,009", "0,011", "0,030", "0,044", "0,052", "0,054"], "textposition": "outside", "type": "bar", "width": 0.6, "x": {"bdata": "64c5uQIkfj+gUHSgvMmCP/UWPxtTMYM/oCOstQ+Ihj/Vn3SItsyeP31xMFQPrKY/kF/HuMqEqj+jfMRLG8irPw==", "dtype": "f8"}, "y": ["Material de las paredes", "Estrato", "Nivel educativo", "Lugar de preparación de alimentos", "Enfermos en la sección censal", "Edad agrupada", "Otros enfermos en el hogar", "Municipio"]}], "layout": {"height": 400, "margin": {"t": 108}, "template": {"layout": {"colorway": ["#1B6CA8", "#DD6B20", "#5B6FB5", "#A86C00"], "font": {"color": "#3A4F60", "family": "Atkinson Hyperlegible Next, Segoe UI, Arial, sans-serif", "size": 13}, "hoverlabel": {"align": "left", "bgcolor": "#10293B", "bordercolor": "#10293B", "font": {"color": "#FFFFFF", "family": "Atkinson Hyperlegible Next, Segoe UI, Arial, sans-serif", "size": 13}}, "legend": {"font": {"color": "#3A4F60"}, "orientation": "h", "x": 0, "xanchor": "left", "y": 1.0, "yanchor": "bottom"}, "margin": {"b": 56, "l": 10, "r": 24, "t": 84}, "paper_bgcolor": "rgba(0,0,0,0)", "plot_bgcolor": "rgba(0,0,0,0)", "separators": ",.", "xaxis": {"automargin": true, "gridcolor": "#D9E1E7", "linecolor": "#A9B6C1", "tickcolor": "#A9B6C1", "title": {"font": {"color": "#54697A", "size": 13}}, "zeroline": false}, "yaxis": {"automargin": true, "gridcolor": "#D9E1E7", "linecolor": "#A9B6C1", "tickcolor": "#A9B6C1", "title": {"font": {"color": "#54697A", "size": 13}}, "zeroline": false}}}, "title": {"font": {"color": "#10293B", "size": 17}, "pad": {"t": 12}, "subtitle": {"font": {"color": "#54697A", "size": 13}, "text": "En azul, las dos variables añadidas"}, "text": "Las ocho variables con mayor importancia por permutación", "x": 0, "xanchor": "left", "xref": "paper", "y": 1, "yanchor": "top", "yref": "container"}, "xaxis": {"range": [0, 0.06402805951955746], "title": {"text": "Caída media de AP en validación"}}, "yaxis": {"showgrid": false}}}</script><noscript><img alt="_images/5131dd77339c2cc6a374f88c3576e68c76bcde4729128d994c552c4f580c6ba9.png" src="_images/5131dd77339c2cc6a374f88c3576e68c76bcde4729128d994c552c4f580c6ba9.png" /></noscript>
+<div class="figura-interactiva" data-datos="datos-e9a85d3ac248"></div><script type="application/json" id="datos-e9a85d3ac248">{"config": {"displayModeBar": false, "responsive": true}, "data": [{"cliponaxis": false, "customdata": {"bdata": "8ri8+HOAOD9qAeq9bkVLPxSn3lESqkI/yO/Sy9KkWj8dYzGmBYhRP2mX/TnBQWE/", "dtype": "f8"}, "hovertemplate": "%{y}<br>Caída media de AP: %{x:.4f}<br>Desviación: %{customdata:.4f}<extra><\/extra>", "marker": {"color": "#A9B6C1"}, "name": "Variables de la versión 1", "orientation": "h", "text": ["0,007", "0,009", "0,009", "0,011", "0,044", "0,054"], "textposition": "outside", "type": "bar", "width": 0.6, "x": {"bdata": "64c5uQIkfj+gUHSgvMmCP/UWPxtTMYM/oCOstQ+Ihj99cTBUD6ymP6N8xEsbyKs/", "dtype": "f8"}, "y": ["Material de las paredes", "Estrato", "Nivel educativo", "Lugar de preparación de alimentos", "Edad agrupada", "Municipio"]}, {"cliponaxis": false, "customdata": {"bdata": "EI1WRlIHXj8BXf49o39OPw==", "dtype": "f8"}, "hovertemplate": "%{y}<br>Caída media de AP: %{x:.4f}<br>Desviación: %{customdata:.4f}<extra><\/extra>", "marker": {"color": "#1B6CA8"}, "name": "Variables de contexto añadidas (versión 2)", "orientation": "h", "text": ["0,030", "0,052"], "textposition": "outside", "type": "bar", "width": 0.6, "x": {"bdata": "1Z90iLbMnj+QX8e4yoSqPw==", "dtype": "f8"}, "y": ["Enfermos en la sección censal", "Otros enfermos en el hogar"]}], "layout": {"height": 400, "margin": {"t": 108}, "showlegend": true, "template": {"layout": {"colorway": ["#1B6CA8", "#DD6B20", "#5B6FB5", "#A86C00"], "font": {"color": "#3A4F60", "family": "Atkinson Hyperlegible Next, Segoe UI, Arial, sans-serif", "size": 13}, "hoverlabel": {"align": "left", "bgcolor": "#10293B", "bordercolor": "#10293B", "font": {"color": "#FFFFFF", "family": "Atkinson Hyperlegible Next, Segoe UI, Arial, sans-serif", "size": 13}}, "legend": {"font": {"color": "#3A4F60"}, "orientation": "h", "x": 0, "xanchor": "left", "y": 1.0, "yanchor": "bottom"}, "margin": {"b": 56, "l": 10, "r": 24, "t": 84}, "paper_bgcolor": "rgba(0,0,0,0)", "plot_bgcolor": "rgba(0,0,0,0)", "separators": ",.", "xaxis": {"automargin": true, "gridcolor": "#D9E1E7", "linecolor": "#A9B6C1", "tickcolor": "#A9B6C1", "title": {"font": {"color": "#54697A", "size": 13}}, "zeroline": false}, "yaxis": {"automargin": true, "gridcolor": "#D9E1E7", "linecolor": "#A9B6C1", "tickcolor": "#A9B6C1", "title": {"font": {"color": "#54697A", "size": 13}}, "zeroline": false}}}, "title": {"font": {"color": "#10293B", "size": 17}, "pad": {"t": 12}, "subtitle": {"font": {"color": "#54697A", "size": 13}, "text": "Color según la versión en que entró la variable"}, "text": "Las ocho variables con mayor importancia por permutación", "x": 0, "xanchor": "left", "xref": "paper", "y": 1, "yanchor": "top", "yref": "container"}, "xaxis": {"range": [0, 0.06402805951955746], "title": {"text": "Caída media de AP en validación"}}, "yaxis": {"categoryarray": ["Material de las paredes", "Estrato", "Nivel educativo", "Lugar de preparación de alimentos", "Enfermos en la sección censal", "Edad agrupada", "Otros enfermos en el hogar", "Municipio"], "categoryorder": "array", "showgrid": false}}}</script><noscript><img alt="_images/e9a85d3ac24830f1007963cb6e579dd17d7c985c6bbc5d16f13225c191a23b30.png" src="_images/e9a85d3ac24830f1007963cb6e579dd17d7c985c6bbc5d16f13225c191a23b30.png" /></noscript>
 </div>
 </div>
 <p>Municipio y edad ya dominaban la versión 1. Ahora los acompañan las dos variables de contexto. La fuerza del municipio indica que parte del rendimiento se apoya en patrones territoriales de 2018.</p>
@@ -1806,6 +2030,166 @@
 </div>
 <p>La salida es una puntuación experimental basada en el censo de 2018. No es un diagnóstico ni una condición para recibir atención. Un formulario público tendría que obtener la proporción de la sección sin publicar cifras de secciones pequeñas, por lo que el tablero presenta resultados agregados.</p>
 </section>
+<section id="bis-se-puede-mejorar-experimento-de-noviembre-de-2026">
+<h2>11 bis. ¿Se puede mejorar? Experimento de noviembre de 2026<a class="headerlink" href="#bis-se-puede-mejorar-experimento-de-noviembre-de-2026" title="Link to this heading">#</a></h2>
+<p>Ante la observación de que el modelo «predice poco», se buscó una mejora con un protocolo escrito antes de mirar la validación (<code class="docutils literal notranslate"><span class="pre">ml_salud/experimento_mejora/INFORME.md</span></code>). Se conservaron la cohorte, la etiqueta y las particiones, y <strong>la prueba no se consultó</strong>. Se probaron otro algoritmo (LightGBM) y variables territoriales nuevas, entre ellas la proporción de vecinos de la misma sección o manzana que quedó fuera de la ruta, calculada solo con etiquetas de entrenamiento y sin la propia vivienda.</p>
+<p>La celda lee los resultados guardados; el experimento completo se repite con <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">ml_salud.experimento_mejora.ejecutar</span> <span class="pre">--data-dir</span> <span class="pre">datos</span></code>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">mejora</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">((</span><span class="n">PROYECTO</span> <span class="o">/</span> <span class="s2">"ml_salud/experimento_mejora/salidas/validacion.json"</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">))</span>
+<span class="n">por_seccion</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">((</span><span class="n">PROYECTO</span> <span class="o">/</span> <span class="s2">"ml_salud/experimento_mejora/salidas/cv_seccion.json"</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">))[</span><span class="s2">"cv_por_seccion"</span><span class="p">]</span>
+<span class="n">por_seccion</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">((</span><span class="n">PROYECTO</span> <span class="o">/</span> <span class="s2">"ml_salud/experimento_mejora/salidas/cv_seccion_complemento.json"</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">))[</span><span class="s2">"cv_por_seccion"</span><span class="p">])</span>
+<span class="n">FAMILIAS</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"F0_v2"</span><span class="p">:</span> <span class="s2">"Mismas 28 variables"</span><span class="p">,</span> <span class="s2">"F1_v2+TE_seccion"</span><span class="p">:</span> <span class="s2">"+ vecinos de la sección"</span><span class="p">,</span>
+            <span class="s2">"F2_v2+TE_seccion+TE_manzana"</span><span class="p">:</span> <span class="s2">"+ vecinos de la sección y la manzana"</span><span class="p">,</span>
+            <span class="s2">"F3_F2+agregados"</span><span class="p">:</span> <span class="s2">"+ vecinos y perfil de la sección"</span><span class="p">,</span> <span class="s2">"F4_v2+agregados_sin_etiqueta"</span><span class="p">:</span> <span class="s2">"+ perfil de la sección (sin vecinos)"</span><span class="p">}</span>
+<span class="n">filas</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">clave</span><span class="p">,</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">mejora</span><span class="p">[</span><span class="s2">"tabla"</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="k">if</span> <span class="n">clave</span> <span class="o">==</span> <span class="s2">"prevalencia"</span><span class="p">:</span>
+        <span class="k">continue</span>
+    <span class="n">familia</span><span class="p">,</span> <span class="n">algoritmo</span> <span class="o">=</span> <span class="n">clave</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"|"</span><span class="p">)</span>
+    <span class="n">rol</span> <span class="o">=</span> <span class="s2">"Modelo actual"</span> <span class="k">if</span> <span class="n">clave</span> <span class="o">==</span> <span class="n">mejora</span><span class="p">[</span><span class="s2">"referencia"</span><span class="p">]</span> <span class="k">else</span> <span class="s2">"Mejor candidato"</span> <span class="k">if</span> <span class="n">clave</span> <span class="o">==</span> <span class="n">mejora</span><span class="p">[</span><span class="s2">"candidato"</span><span class="p">]</span> <span class="k">else</span> <span class="s2">""</span>
+    <span class="n">filas</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s2">"Variables"</span><span class="p">:</span> <span class="n">FAMILIAS</span><span class="p">[</span><span class="n">familia</span><span class="p">],</span> <span class="s2">"Algoritmo"</span><span class="p">:</span> <span class="s2">"LightGBM"</span> <span class="k">if</span> <span class="n">algoritmo</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"lgb"</span><span class="p">)</span> <span class="k">else</span> <span class="s2">"Boosting de histogramas"</span><span class="p">,</span>
+                  <span class="s2">""</span><span class="p">:</span> <span class="n">rol</span><span class="p">,</span> <span class="s2">"AP CV"</span><span class="p">:</span> <span class="n">decimal</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s2">"ap_cv_media"</span><span class="p">]),</span> <span class="s2">"AP validación"</span><span class="p">:</span> <span class="n">decimal</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s2">"ap_val"</span><span class="p">]),</span>
+                  <span class="s2">"ROC-AUC validación"</span><span class="p">:</span> <span class="n">decimal</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s2">"roc_auc_val"</span><span class="p">]),</span>
+                  <span class="s2">"AP en secciones no vistas"</span><span class="p">:</span> <span class="n">decimal</span><span class="p">(</span><span class="n">por_seccion</span><span class="p">[</span><span class="n">clave</span><span class="p">][</span><span class="s2">"ap_media"</span><span class="p">])</span> <span class="k">if</span> <span class="n">clave</span> <span class="ow">in</span> <span class="n">por_seccion</span> <span class="k">else</span> <span class="s2">"—"</span><span class="p">})</span>
+<span class="n">ver</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">filas</span><span class="p">),</span> <span class="s2">"Variantes del experimento de mejora (la prueba no se usó)"</span><span class="p">)</span>
+
+<span class="n">b</span> <span class="o">=</span> <span class="n">mejora</span><span class="p">[</span><span class="s2">"bootstrap_pareado"</span><span class="p">]</span>
+<span class="n">ver</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([{</span><span class="s2">"Comparación"</span><span class="p">:</span> <span class="s2">"Mejor candidato menos modelo actual"</span><span class="p">,</span> <span class="s2">"Diferencia de AP en validación"</span><span class="p">:</span> <span class="n">decimal</span><span class="p">(</span><span class="n">b</span><span class="p">[</span><span class="s2">"delta_ap"</span><span class="p">]),</span>
+                   <span class="s2">"IC 95 </span><span class="si">% i</span><span class="s2">nferior"</span><span class="p">:</span> <span class="n">decimal</span><span class="p">(</span><span class="n">b</span><span class="p">[</span><span class="s2">"ic95_delta_ap"</span><span class="p">][</span><span class="mi">0</span><span class="p">]),</span> <span class="s2">"IC 95 </span><span class="si">% s</span><span class="s2">uperior"</span><span class="p">:</span> <span class="n">decimal</span><span class="p">(</span><span class="n">b</span><span class="p">[</span><span class="s2">"ic95_delta_ap"</span><span class="p">][</span><span class="mi">1</span><span class="p">]),</span>
+                   <span class="s2">"Método"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"Bootstrap pareado, </span><span class="si">{</span><span class="n">b</span><span class="p">[</span><span class="s1">'replicas_validas'</span><span class="p">]</span><span class="si">}</span><span class="s2"> remuestreos de </span><span class="si">{</span><span class="n">entero</span><span class="p">(</span><span class="n">b</span><span class="p">[</span><span class="s1">'unidades_remuestreadas'</span><span class="p">])</span><span class="si">}</span><span class="s2"> viviendas"</span><span class="p">}]),</span>
+    <span class="s2">"Tamaño de la mejora en validación"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><p style='margin:1em 0 .4em'>Variantes del experimento de mejora (la prueba no se usó)</p></div><div class="output text_html"><table class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Variables</th>
+      <th>Algoritmo</th>
+      <th></th>
+      <th>AP CV</th>
+      <th>AP validación</th>
+      <th>ROC-AUC validación</th>
+      <th>AP en secciones no vistas</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Mismas 28 variables</td>
+      <td>Boosting de histogramas</td>
+      <td>Modelo actual</td>
+      <td>0,374</td>
+      <td>0,386</td>
+      <td>0,701</td>
+      <td>0,359</td>
+    </tr>
+    <tr>
+      <td>Mismas 28 variables</td>
+      <td>LightGBM</td>
+      <td></td>
+      <td>0,378</td>
+      <td>0,389</td>
+      <td>0,705</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>+ vecinos de la sección</td>
+      <td>Boosting de histogramas</td>
+      <td></td>
+      <td>0,392</td>
+      <td>0,406</td>
+      <td>0,722</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>+ vecinos de la sección</td>
+      <td>LightGBM</td>
+      <td></td>
+      <td>0,394</td>
+      <td>0,408</td>
+      <td>0,723</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>+ vecinos de la sección y la manzana</td>
+      <td>Boosting de histogramas</td>
+      <td></td>
+      <td>0,407</td>
+      <td>0,427</td>
+      <td>0,741</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>+ vecinos de la sección y la manzana</td>
+      <td>LightGBM</td>
+      <td></td>
+      <td>0,410</td>
+      <td>0,428</td>
+      <td>0,741</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>+ vecinos y perfil de la sección</td>
+      <td>Boosting de histogramas</td>
+      <td></td>
+      <td>0,410</td>
+      <td>0,426</td>
+      <td>0,741</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>+ vecinos y perfil de la sección</td>
+      <td>LightGBM</td>
+      <td>Mejor candidato</td>
+      <td>0,413</td>
+      <td>0,429</td>
+      <td>0,742</td>
+      <td>0,350</td>
+    </tr>
+    <tr>
+      <td>+ perfil de la sección (sin vecinos)</td>
+      <td>Boosting de histogramas</td>
+      <td></td>
+      <td>0,395</td>
+      <td>0,406</td>
+      <td>0,717</td>
+      <td>0,362</td>
+    </tr>
+    <tr>
+      <td>+ perfil de la sección (sin vecinos)</td>
+      <td>LightGBM</td>
+      <td></td>
+      <td>0,402</td>
+      <td>0,414</td>
+      <td>0,727</td>
+      <td>0,360</td>
+    </tr>
+  </tbody>
+</table></div><div class="output text_html"><p style='margin:1em 0 .4em'>Tamaño de la mejora en validación</p></div><div class="output text_html"><table class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Comparación</th>
+      <th>Diferencia de AP en validación</th>
+      <th>IC 95 % inferior</th>
+      <th>IC 95 % superior</th>
+      <th>Método</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Mejor candidato menos modelo actual</td>
+      <td>0,043</td>
+      <td>0,032</td>
+      <td>0,054</td>
+      <td>Bootstrap pareado, 250 remuestreos de 12.718 viviendas</td>
+    </tr>
+  </tbody>
+</table></div></div>
+</div>
+<p>Cómo leerlo. Cambiar de algoritmo casi no cambia nada. La mejora grande llega solo al usar lo que respondieron los vecinos, y desaparece en secciones censales que el modelo no vio: depende de conocer de antemano las respuestas de la zona. Es un efecto de conglomerado del mismo censo, que puede reflejar la oferta local de servicios o la forma de responder, y el censo no permite separarlas. <strong>Por eso se conserva la versión 2</strong>: el límite está en la información del censo, no en el algoritmo. Los intervalos están condicionados a los modelos ya entrenados y no incluyen la variabilidad de elegir entre las variantes exploradas.</p>
+</section>
 <section id="conclusiones">
 <h2>12. Conclusiones<a class="headerlink" href="#conclusiones" title="Link to this heading">#</a></h2>
 <ol class="arabic simple">
@@ -1874,16 +2258,16 @@
         },
         codeMirrorConfig: {
             theme: "abcdef",
-            mode: "python"
+            mode: "modelo-salud"
         },
         kernelOptions: {
-            name: "python3",
+            name: "modelo-salud",
             path: "./."
         },
         predefinedOutput: true
     }
     </script>
-    <script>kernelName = 'python3'</script>
+    <script>kernelName = 'modelo-salud'</script>
 
                 </article>
               
@@ -1938,10 +2322,14 @@
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#particiones-y-preprocesamiento">4. Particiones y preprocesamiento</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#modelos-candidatos">5. Modelos candidatos</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#modelos-candidatos">5. Modelos candidatos</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#por-que-escogimos-el-boosting-de-histogramas">¿Por qué escogimos el boosting de histogramas?</a></li>
+</ul>
+</li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#por-que-existe-una-version-2">6. Por qué existe una versión 2</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#modelo-final-y-umbral">7. Modelo final y umbral</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evaluacion-en-la-prueba-interna">8. Evaluación en la prueba interna</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#por-que-las-metricas-se-ven-bajas-el-modelo-predice">¿Por qué las métricas se ven bajas? ¿El modelo predice?</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#calibracion">Calibración</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#umbral-y-priorizacion">Umbral y priorización</a></li>
 </ul>
@@ -1949,6 +2337,7 @@
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#variables-mas-influyentes">9. Variables más influyentes</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#diferencias-entre-grupos">10. Diferencias entre grupos</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#como-se-usa-el-modelo-guardado">11. Cómo se usa el modelo guardado</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bis-se-puede-mejorar-experimento-de-noviembre-de-2026">11 bis. ¿Se puede mejorar? Experimento de noviembre de 2026</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#conclusiones">12. Conclusiones</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#limites">Límites</a></li>
 </ul>

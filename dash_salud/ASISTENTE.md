@@ -4,12 +4,12 @@ BQSI responde preguntas sobre los datos, los indicadores, la metodología, los r
 
 ## Fuentes
 
-`data/conocimiento.json` reúne 229 pasajes, generados con `python -m dash_salud.generar_conocimiento`:
+`data/conocimiento.json` reúne 274 pasajes, generados con `python -m dash_salud.generar_conocimiento`:
 
 - Textos y tablas agregadas de `contenido.json`.
 - Métricas del modelo validado en `modelo.json`.
 - Prosa del informe en `informe/`. Sus tablas se omiten porque no siempre pasan por el redondeo de las aplicaciones.
-- 47 respuestas de referencia a las preguntas más comunes, con cifras leídas de esos mismos archivos.
+- 62 respuestas de referencia a las preguntas más comunes, con cifras leídas de esos mismos archivos.
 
 Si cambia el informe o el contenido, hay que regenerarlo.
 
@@ -22,7 +22,7 @@ Si cambia el informe o el contenido, hay que regenerarlo.
 
 Si la llamada falla, llega al tope diario o la redacción trae una cifra que no está en las fuentes, se descarta y se vuelve al modo de demostración con un aviso.
 
-En ambos modos, las preguntas por municipios, grupos y órdenes se contestan con los agregados publicados, sin pasar por un modelo. El widget conserva la conversación mientras la página sigue abierta y envía al servidor hasta cuatro turnos recientes. En modo conectado dan contexto a preguntas como «¿por qué?»; sin modelo, el asistente pide que se aclare el tema.
+En ambos modos, las preguntas por municipios, grupos y órdenes se contestan con los agregados publicados, sin pasar por un modelo. Las preguntas frecuentes sobre el modelo (cuál es el mejor, por qué se escogió, cómo se dividieron los datos, exactitud, umbral de 0,5, por qué las métricas son bajas, hiperparámetros, etc.) se reconocen con las reglas `INTENCIONES` de `asistente.py` y llevan directamente a su respuesta de referencia; la búsqueda por palabras confundía, por ejemplo, «el mejor modelo» con «menor es mejor». El widget conserva la conversación mientras la página sigue abierta y envía al servidor hasta cuatro turnos recientes. En modo conectado dan contexto a preguntas como «¿por qué?»; sin modelo, el asistente pide que se aclare el tema.
 
 ## Reglas
 

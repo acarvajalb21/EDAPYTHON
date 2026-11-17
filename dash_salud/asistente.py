@@ -61,6 +61,34 @@ VARIABLES = {
     "dificultad": r"\b(dificultad|discapacidad)\b", "estrato": r"\b(estrato|estratos)\b",
     "sexo": r"\b(sexo|hombres?|mujer|mujeres|genero)\b", "zona": r"\b(zona|zonas|clase de area|rural|cabeceras?|urban\w+)\b",
 }
+# Preguntas frecuentes sobre el modelo que se dicen de muchas formas. Se comprueban en orden y llevan
+# directamente a su respuesta de referencia: la búsqueda por palabras confundía, por ejemplo,
+# «el mejor modelo» con «menor es mejor» de la definición de Brier.
+MODELO_PALABRA = r"(modelo|modelos|algoritmo|algoritmos|clasificador|clasificadores|candidato|candidatos)"
+INTENCIONES = [
+    (r"^\W*(que es|que significa|definicion de) (el )?umbral\W*$", "Término: Umbral"),
+    (r"\bumbral\b.*\b0[,.]5\b|\b0[,.]5\b.*\bumbral\b|\bpor que no\b.*\b0[,.]5\b", "¿Por qué no se usa el umbral de 0,5?"),
+    (r"\b(mejorar\w*|mejoraria\w*|mejora (el|al) modelo|subir (la|las) (cifra|metrica)\w*|lightgbm|xgboost|catboost|otros? algoritmos?)\b", "¿Se puede mejorar el modelo?"),
+    (r"\b(peor|mas malo|menos bueno)\b.*\b" + MODELO_PALABRA + r"\b|\b" + MODELO_PALABRA + r"\b.*\b(peor|mas malo)\b", "¿Cuál fue el peor modelo?"),
+    (r"\bpor ?que\b.*\b(escog|elig|eligi|seleccion|prefir|usaron|gano)\w*\b.*\b(" + MODELO_PALABRA[1:-1] + r"|boosting|ese|este)\b"
+     r"|\bpor ?que\b.*\b(" + MODELO_PALABRA[1:-1] + r"|boosting)\b.*\b(escog|elig|eligi|seleccion|prefir|gano)\w*|\bpor ?que\b.*\bboosting\b", "¿Por qué se escogió ese modelo?"),
+    (r"\bcomo (se )?(valid\w*|evalu\w*)\b|\bcomo (lo )?(validaron|evaluaron|probaron)\b", "¿Cómo se dividieron los datos de entrenamiento y prueba?"),
+    (r"\b(razon|razones|motivo|justifica\w*|criterio)\w*\b.*\b(escog|elec|elig|seleccion)\w*", "¿Por qué se escogió ese modelo?"),
+    (r"\b(mejor|ganador|gano|ganaron|escogido|elegido|seleccionado|final)\b.*\b" + MODELO_PALABRA + r"\b|\b" + MODELO_PALABRA + r"\b.*\b(mejor|gano|ganador|escogi\w*|elegi\w*|seleccion\w*|final)\b", "¿Cuál es el mejor modelo?"),
+    (r"\b(que|cuales|cuantos)\b.*\b" + MODELO_PALABRA + r"\b.*\b(compar\w*|prob\w*|evalu\w*|usaron|entrenaron|ensay\w*)\b|\bcompara\w*\b.*\b(modelos|algoritmos)\b|\brandom forest\b.*\blogistic\w*\b|\blogistic\w*\b.*\brandom forest\b", "¿Qué modelos se compararon?"),
+    (r"\b(dividi\w*|divisi\w*|separ\w*|parti\w*|split|reparti\w*)\b.*\b(entren\w*|prueba|test|validacion|datos|conjunto\w*)\b|\b(entrenamiento|train)\b.*\b(prueba|test)\b|\bcuant\w* (datos|personas|registros) (hay )?(en|de|para) (la |el )?(prueba|entrenamiento|validacion|test)\b|\bporcentaje\b.*\b(entrenamiento|prueba|validacion)\b", "¿Cómo se dividieron los datos de entrenamiento y prueba?"),
+    (r"\bhiperparametro\w*|\bparametros\b.*\b(modelo|boosting|usaron|eligieron)\b", "¿Qué hiperparámetros usa el modelo?"),
+    (r"\b(exactitud|accuracy)\b|\bcuant\w* acierta\b|\bporcentaje de aciertos\b", "¿Cuál es la exactitud del modelo?"),
+    (r"\b(baj[oa]s?|bajit[oa]s?|mal[oa]s?|pobres?|floj[oa]s?|deficientes?|regular(es)?)\b.*\b(modelo|metricas?|resultados?|desempeno|rendimiento|auc|ap)\b"
+     r"|\b(modelo|metricas?|resultados?|desempeno|rendimiento|auc)\b.*\b(baj[oa]s?|bajit[oa]s?|mal[oa]s?|pobres?|floj[oa]s?|deficientes?)\b|\bpor que\b.*\bno (es|son) (mejor|mejores|mas alt\w*)\b", "¿Por qué las métricas del modelo son bajas?"),
+    (r"\b(no predice|predice (algo|bien|mal|poco)|sirve para predecir|realmente predice|si predice|puede predecir)\b", "¿El modelo predice?"),
+    (r"\bmatriz de confusion\b", "¿Qué es la matriz de confusión?"),
+    (r"\bvariable\w* (mas|que mas) (importante|influ\w*|pesa\w*)\b|\b(mas importante|mas influyente)\b.*\bvariable\w*\b", "¿Cuál es la variable más importante?"),
+    (r"\b(baseline|linea base|modelo de referencia|referencia sin modelo)\b", "¿Qué es la referencia o baseline?"),
+    (r"\b(que es|como funciona|explica\w*)\b.*\b(boosting|gradient boosting|histogram\w*)\b", "¿Qué es el boosting de histogramas?"),
+    (r"\b(fuga|leakage|sobreajuste|overfitting)\b", "¿Cómo se evitó la fuga de información?"),
+    (r"\b(variable objetivo|variable respuesta|target|clase positiva|que se predice|que predice el modelo)\b", "¿Cuál es la variable objetivo?"),
+]
 FUENTE_DATOS = "Aplicación, sección EDA multivariado, Comparar variables"
 SIN_INFORMACION = {"No sabe", "Sin dato"}
 BASE_MINIMA = 200
@@ -75,8 +103,8 @@ SIGUIENTES = {
     "municipio": ["¿Qué municipio tiene el mayor porcentaje?", "¿Por qué algunos porcentajes se ocultan?"],
     "datos": ["¿Hay diferencia entre hombres y mujeres?", "¿Cómo cambia con la edad?", "¿Qué es la V de Cramér?"],
     "filtros": ["¿Por qué algunos porcentajes se ocultan?", "¿Qué es la cobertura?"],
-    "modelo": ["¿Qué significa la precisión promedio?", "¿En qué falla el modelo?", "¿Qué variables pesan más en el modelo?"],
-    "concepto": ["¿Cuál es el resultado principal?", "¿Qué limitaciones tiene el análisis?", "¿Qué tan bueno es el modelo?"],
+    "modelo": ["¿Cuál es el mejor modelo?", "¿Por qué se escogió ese modelo?", "¿Cómo se dividieron los datos de entrenamiento y prueba?", "¿En qué falla el modelo?"],
+    "concepto": ["¿Cuál es el resultado principal?", "¿Cuál es el mejor modelo?", "¿Qué limitaciones tiene el análisis?"],
 }
 
 SISTEMA = """Eres BQSI, el asistente de un proyecto universitario sobre las respuestas de salud del Censo Nacional de Población y Vivienda 2018 en el Atlántico, Colombia.
@@ -245,6 +273,7 @@ class Asistente:
         pasajes = json.loads(RUTA.read_text(encoding="utf-8"))
         self.indice = Indice(pasajes)
         self.glosario = {p["titulo"].removeprefix("Término: "): p["texto"] for p in pasajes if p["tipo"] == "glosario"}
+        self.referencias = {p["titulo"]: p for p in pasajes if p["tipo"] in ("respuesta", "glosario")}
         self.resumen_filtros = resumen_filtros
         self.consulta_municipio = consulta_municipio
         self.municipios = {sin_acentos(m): m for m in municipios}
@@ -367,6 +396,13 @@ class Asistente:
                 return self._respuesta(pregunta, "No tienes filtros activos. Elige un grupo en EDA multivariado, en la pestaña Explorar grupos, y vuelve a preguntar.", "filtros", [])
             return self._respuesta(pregunta, "Este es el resultado de tu selección actual.", "filtros",
                                    [{"n": 1, "titulo": "Por qué algunos resultados no aparecen", "fuente": "Aplicación, sección EDA multivariado", "seccion": "explorar"}], filtros)
+
+        for patron, titulo in INTENCIONES:
+            if titulo in self.referencias and re.search(patron, plano):
+                p = self.referencias[titulo]
+                tema = "modelo" if p.get("seccion") in ("modelo", "creacion") else "concepto"
+                fuente = {"n": 1, "titulo": p["titulo"], "fuente": p["fuente"], "seccion": p.get("seccion"), "pagina": p.get("pagina")}
+                return self._respuesta(pregunta, f"{p['texto']} [1]", tema, [fuente], filtros)
 
         datos = self._consulta_datos(pregunta, plano, filtros)
         if datos:
