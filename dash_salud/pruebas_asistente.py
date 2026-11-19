@@ -78,7 +78,7 @@ CON_RESPUESTA = [
     ("¿Cómo se dividieron los datos?", "vivienda"),
     ("¿Quién hizo este proyecto?", "Alejandro Carvajal"),
     ("¿De qué año son los datos?", "2018"),
-    # Observaciones del profesor: elección, partición y lectura de las métricas.
+    # Elección del modelo, partición y lectura de las métricas.
     ("¿Cuál es el mejor modelo?", "boosting de histogramas"),
     ("cual es el mejor modelo", "boosting de histogramas"),
     ("¿Qué modelo ganó?", "boosting de histogramas"),

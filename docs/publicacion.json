@@ -1,5 +1,5 @@
 {
-  "source_commit": "cb6d100f67d57d49d53d34f7788492b7558590b6",
+  "source_commit": "b5a7347ebe4e49d520a7fa19a4636128a00e5679",
   "publication_date": "2026-11-17",
   "repository": "EDAPYTHON",
   "html_sha256": {
@@ -7,7 +7,7 @@
     "genindex.html": "4a383a9a389cb8aef037b56220a37b420e36ed673f614e8e72f46bfd7f053620",
     "index.html": "f69d073ec8b792bf1d1799bf35da7e89f2252dc9770a220c274ae4550d30f4c0",
     "intro.html": "80d2460774d732a8a54256522bcf63474ad4e003a879fbff0725c477b23fdd53",
-    "Modelo_acceso_salud_Atlantico_CNPV2018.html": "5b831781fe3766a935e517ebc064105ff7940e539fc546646867f0bbdb003537",
+    "Modelo_acceso_salud_Atlantico_CNPV2018.html": "10256aa9aef707730eb9fd96bc6305a9a26d2239939079362908ea7bd71b548e",
     "search.html": "ca33dd08225e7c0c6144407688d5a50bcc5d0da0d124b5ab8eb463f8dc4e5c9f"
   }
 }
